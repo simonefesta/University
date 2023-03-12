@@ -1,3 +1,5 @@
 # Appunti LM Ingegneria Informatica - Roma, Tor Vergata
 
-![download](https://user-images.githubusercontent.com/55951548/224579490-acf067f1-0e45-4c71-a4ae-c248e576d69a.png)
+![Screenshot_2023-03-13_alle_00 09 29-removebg-preview](https://user-images.githubusercontent.com/55951548/224579672-7262937b-68ea-49d0-a0dd-8d6326e22d13.png)
+
+* Appunti presi durante le lezioni. A volte scrivo sui pdf, a volte rielaboro totalmente le cose, altre volte uso flow chart. Possibili supercazzole, maneggiare con cura.
