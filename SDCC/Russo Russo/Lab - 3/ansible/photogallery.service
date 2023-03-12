@@ -1,0 +1,12 @@
+[Unit]
+Description=Simple systemd service for our web application.
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ec2-user/photogallery
+Environment="FLASK_APP=galleryApp.py"
+ExecStart=/usr/bin/python3 -m flask run -h 0.0.0.0 -p 80
+ExecStop=/bin/kill -TERM $MAINPID
+
+[Install]
+WantedBy=multi-user.target

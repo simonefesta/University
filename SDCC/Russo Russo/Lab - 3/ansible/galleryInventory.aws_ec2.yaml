@@ -1,0 +1,11 @@
+plugin: aws_ec2
+regions:
+  - eu-central-1
+filters:
+  tag:Name: SDCC
+hostnames:
+  - instance-id   # specify hostname used by Ansible to denote hosts
+compose:
+  ansible_host: public_ip_address  # tell Ansible to use public IP for SSH connection
+
+

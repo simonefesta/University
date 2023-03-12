@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<p><a class="button" href="/newpost">New post</a></p>
+	<!-- Photo Grid -->
+	<div class="imageRow">
+	  <div class="imageColumn">
+		{% for img in images1 %}
+		<img src="{{ img }}" style="width:100%">
+		{% endfor %}
+	  </div>
+	  <div class="imageColumn">
+		{% for img in images2 %}
+		<img src="{{ img }}" style="width:100%">
+		{% endfor %}
+	  </div>
+	  <div class="imageColumn">
+		{% for img in images3 %}
+		<img src="{{ img }}" style="width:100%">
+		{% endfor %}
+	  </div>
+	</div>
+{% endblock %}
