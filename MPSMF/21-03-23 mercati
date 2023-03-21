@@ -1,0 +1,104 @@
+21-03-2023 - MODELLO MONOPERIODALE DI INVESTIMENTO
+
+E' un modello in cui, al tempo t = 0 facciamo investimenti, non faccio nulla fino al tempo t = T, dove liquido l'investimento (quindi lavoro solamente al tempo 0 e al tempo T). E' un modello molto comune, detto "da cassettisti", ovvero faccio investimento e dopo un tot lo liquido.
+
+Al tempo t = 0 abbiamo una variabile aleatoria di Dirac X0 in xo.
+Al tempo t = T ho X(T), altra v.a., a seconda che omega grande sia discreto o continuo parliamo di investimenti a stati discreti o continui.
+
+Caso particolare sono i bond sul tesoro americano B(T) US BONDS, anch'essa è di Dirac, x(T) è un valore ben preciso), ho garanzie sui depositi e quindi sono tutelato fino ad una certa cifra. Viene detto PROXY DI UN TITOLO PRIVO DI RISCHIO.
+
+TERMINOLOGIA 8:22
+- Rendimento/Return R(T) (T è pedice) R(T) = X(T) - X0, a destra e sinistra ho v.a.
+- Tasso di rendimento/Rate of return r(T) = R(T)/Xo = (X(T) - Xo)/Xo con Xo != 0
+- Fattore di accumulazione: a(T) = X(T)/Xo
+
+Questo modo di fare investimento, partendo da t0 e guardando "in avanti" è detto forward-looking.
+Sono tutte v.a., quali sono le relazioni tra loro?
+
+|________________________________|
+t = 0                           t = T
+
+X(T) = Xo + R(T)
+R(T) = r(T)*Xo
+X(T) = a(T)*Xo
+a(T) = 1+r(T)
+X(T) = (1 + r(T))*Xo, economicamente è la più "emblematica".
+
+
+Esiste anche la prospettiva "Backward Looking", cioè guardando all'indietro.
+Prendiamo X(T), faccio X(T) - Xo = R(T), ma stavolta lo chiamiamo SCONTO S(T) = X(T) - Xo
+Se voglio X(T) domani quanto devo investire oggi. Forward looking è "vedo quando devo investire oggi per produrre X(T) domani" min 19:40
+
+In realtà, non sono proprio uguali. Sono equivalenti solo se faccio investimento sicuro, quindi dove non ho v.a.
+Ricaviamo anche s(T) = S(T)/X(T) (se S(T) è v.a. s(T) non è ben definito), detto TASSO DI SCONTO.
+
+Esiste anche FATTORE DI SCONTO  d(T) = Xo/X(T). Come prima, anche qui ricaviamo le formule come prima: foglio 2
+da queste ricaviamo anche: d(T)*a(T) = 1
+cioè quando vado avanti o indietro coi miei investimenti (compro bond, vendo allo scoperto etc) le operazioni in avanti o indietro devono essere uguali quando parlo di investimenti a livello certo.
+
+Esempio mutuo - min 27 - NON e' un modello periodale
+ricevo cifra Xo con cui compro casa. Essa è entrata positiva nel mio conto, cioè Xo > 0.
+Questa cifra la devo rimborsare, tramite PIANO di RIMBORSO, ovvero mediante RATE DEL MUTUO R1, R2,...
+Come calcolo le rate del mutuo? facciamo per esempio un mutuo di un anno = 12 mesi.
+il tasso di interesse "r(BCE)" (in realtà si usa r(M) > r(BCE) perchè deve coprirsi dalla possibilità di non ricevere pagamenti). Abbiamo 12 rate, da R1 a R12.
+La rata R12 va rapportata al valore iniziale 0. (cosi come tutte le rate). Ciò che cambia è come la rapporto:
+R12*d12; R11*d11; dove d è fattore di sconto, fino ad arrivare ad R1*d1.
+La somma di questi elementi deve essere uguale a Xo, cioè Xo = R12*d12 + ...... + R1*d1
+d(T)*a(T) = 1 -> d(T) = 1/a(T) = 1/(1 +r(M)) quindi otteniamo figura 3.1:
+
+Perchè abbiamo la potenza al denominatore? Perchè R12 posso rapportarlo a R11, poi a R10,... fino ad arrivare ad R1.
+Cioè da R12 invece di andare diretto al valore iniziale, faccio gli step passando per R11, R10 etc, e quindi dividendo ogni volta al numeratore trovo la potenza. Nel caso delle rate è una cosa più delicata, perchè le rate le pago, quindi non posso solo semplicemente rapportarle (non è monoperiodale, ovvero ho spese nel mezzo). fig 4
+
+Se la rata è costante, cioè R(K) = R per ogni mese: fig 4 rata costante.
+Il valore del denaro, cambia nel tempo in modo coerente.
+
+Min 55:15
+Al giorno d'oggi, chi ha contratto dei mutui a tasso variabile, non si trova "tanto bene". fig 5.
+
+min 1:03:00
+chi è d(T)? è fattore a cui devo moltiplicare X(T) per ottenere Xo, cioè rapporto valore futuro del denaro al valore presente. Quanto vale un dollaro, dato tra 10 anni, oggi rapportato al mercato.
+
+MODELLO MONOPERIODALE 
+
+al tempo T=0 ho stock S, titolo rischioso nel mercato (azione eni, unicredit, intesa...), ha prezzo S0 che noi vediamo (DIrac) e prezzo S(T) random value, che non vediamo. fig 6
+Ho anche il bond. Alcune assunzioni:
+!! I tassi di rendimento su depositi e prestiti sono gli stessi. Se ho una certa cifra che deposito ( == compro un bond), cioè la prendo 'a prestito' e ci pago un interesse, il tasso è lo stesso.
+Considereremo 'r' privo di rischio sia su interessi attivi che passivi.
+!! Gli investimenti sono infinitamente divisibili, ovvero potrei anche investire pigreco euro (che nella realtà non si fa).
+!! I costi di transazione sono nulli. Non pago nulla nelle operazioni di presa in prestito o deposito.
+!! Le vendite allo scoperto sono completamente libere. Posso decidere di vendere uno stock eni che non ho, la banca me le presta, e io glielo restituisco. Nella realtà non è proprio cosi, nel 2009 fu bloccata.
+Se immagino un titolo perderà valore, lo vendo allo scoperto, questo fa diminuire il suo valore (offerta aumenta, prezzo diminuisce), il prezzo scende ancora perchè iniziano a farlo tutti.
+
+Nel mercato, oltre a bond e stock, esistono i DERIVATI (opzioni, futures,...) che dipendono dal valore di un altro titolo.
+
+BOND
+Il bond è v.a. dirac che vale B0 a t=0 e B(T) = (1+r)*B0 a tempo t = T
+Se vale questo, allora ogni somma di denaro soddisfa la stessa legge. Ovvero, il valore futuro di una somma di denaro, è M(T) = M0(1+r) e il valore presente M0 = M(T)/(1+r)
+
+Ad esempio, oggi ho somma denaro M0, ci compro M0/B0 = x0 unità di bond. Oggi posso comprare anche cifre decimali (es. 1.34 bond, però ho sempre una cifra minima sotto la quale non posso acquistare i bond).
+Alla fine della scadenza, avrò x0*B(T) = x0* (1+r)B0, ma x0 = M0/B0, quindi x0*B(T) = M0(1+r) = M(T)
+quello che vale per il bond, vale per ogni somma di denaro. Vale anche l'inverso.
+
+Quanto devo investire oggi per avere al tempo T somma di denaro M(T)?
+devo comprare quantità di unità di bond x = M(0)/B0 tale che x*B(T) = M(T); dove x*B(T) = x*(1+r)B0 = M(T)
+ma x = M0/B0 da cui M(T) = M0*(1+r) e quindi M0 = M(T)/(1+r)
+Quanto è realistico ciò? Nella realtà non funziona cosi, perchè dovrei investire tutto il mio conto corrente in bond. Ciò però non è possibile, serve anche un pò di liquidità, quantomeno lo stretto indispensabile, perchè tenerli sul cc i soldi perdono di valore. Il meccanismo funziona perchè investo la quantità che ho nel bond, ma se non lo faccio, tale meccanismo non funziona.
+Il bond rappresenta in tutto e per tutto il denaro, diventa sinonimo di conto corrente.
+(bond tedeschi tasso di interesse piu basso)
+
+
+Lo stock come lo modelliamo?
+prendo Beta v.a. di Bernoulli, può prendere valore u ("up") con probabilità p, o valore d ("down") con probabilità q.
+S(T) = beta*S0
+è un modello giocattolo, perchè tutta l'aleatorietà è data da una bernoulliana molto semplice.
+S(T) può assumere valori S^+(T)= u*S0 con P(S(T) = u*S0)) = p oppure S^-(T) = d*S0 con P(S(T) = d*S0))
+
+Dopo n passi avrò al periodo n-esimo S(n) = beta^(n)*S0 (anteprima del modello multiperiodale)
+beta è variabile ausiliaria per passare da multiperiodale a monoperiodale.
+
+es: calcola speranza di S(T) e varianza di S(T)
+
+
+
+
+
