@@ -58,6 +58,10 @@
     double service;                            /*   service times      */
     double interarrival;                       /*   interarrival times */
   } sum = {0.0, 0.0, 0.0};
+  
+  double maxdelay = 0.0;  //meno non può essere!
+  int t = 400;
+  double jobsInNode = 0;
 
   fp = fopen(FILENAME, "r");
   if (fp == NULL) {
@@ -78,6 +82,10 @@
     sum.delay   += delay;
     sum.wait    += wait;
     sum.service += service;
+    if (arrival <= t && departure >= t) jobsInNode++; 
+
+    if (delay > maxdelay) maxdelay = delay;   /* ritardo massimo*/
+
   }
   sum.interarrival = arrival - START;
 
@@ -86,6 +94,19 @@
   printf("   average service time .... = %6.2f\n", sum.service / index);
   printf("   average delay ........... = %6.2f\n", sum.delay / index);
   printf("   average wait ............ = %6.2f\n", sum.wait / index);
+  printf("   maximum delay ........... = %6.2f\n", maxdelay);
+  
+
+
+  printf("\nstatistics time-average\n");
+  double throughput = index/departure; 	/* throughput medo del sistema in Cn, al numeratore ho il numero di job (index), e al denominatore l'ultimo completamento Cn */
+  printf(" average population in the center = %6.2f\n", throughput*(sum.wait/index));
+  printf(" average population in the queue = %6.2f\n", throughput*(sum.delay/index));
+  printf(" average population in the server = %6.2f\n", throughput*(sum.service/index));
+  double percentage = jobsInNode*100/index;
+  printf(" al tempo t = %d, sono presenti %6.2f jobs, cioè il %6.2f percento \n",t,jobsInNode,percentage);
+
+
 
   fclose(fp);
   return (0);
