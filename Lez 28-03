@@ -1,0 +1,148 @@
+Introduzione CR toy
+Riprendiamo al volo Bond e Stock
+
+B0, B(T) = (1+r(p)B0
+
+S0, S(T)+ = S0*u  con P(S(T) = u*S0) = p
+    S(T)- = S0*d  con P(S(T) = d*S0) = 1-p
+
+S(T) = beta*S0   Beta = { u   P(Beta=u) = y greca
+                          d   P(Beta=d) = phi  }
+
+Mentre (B(T) - B0)/Bo = r(p), per lo stock ho (S(T) - S0)/S0 due casi: {    (u*S0-S0)/S0 = u - 1  con prob p
+                                                                            (du*S0-S0)/S0 = d - 1 con prob q }
+
+Per convenzione u > d, allora r(T) può essere r(T)+ = u -1 oppure r(T)- = d - 1
+
+r(T) con barra sopra = E[r(T)] = (u-1)p + (d-1)p = up + dq - 1
+
+S(T) = (1 + r(T))*S0
+
+E[S(T)] = (1 + E[r(T)]*S0
+
+S0 = 1/( 1 + E[r(T)]) * E[S(T)]     mentre B0 = 1/(1+2p)*B(T) molto simili. S(T) non deterministico però.
+
+
+PORTAFOGLIO DI ARBITRAGGIO BS
+Esso è una coppia (x,y) dove x è la componente di Bond e y è la componente di portafoglio. Ovvero il portafoglio comprende sia bond che stock.
+Il valore iniziale del portafoglio è: W0 = x*B0 + y*S0
+Al tempo 't' avrò valore W(T) = x*B(T) + y*S(T)
+
+Anche in questo caso avrò W(T)+ = x(1+ r(f))*B0 + y*u*S0 se mi dice bene, oppure W(T)- = x(1+ r(f))*B0 + y*d*S0 se mi dice male (cambia solo S0).
+
+Definiamo ora il portafoglio di arbitraggio:
+BS portafoglio è un arbitraggio quando si ha che: 
+W(0) = 0
+P(W(T)>=0) = 1
+P(W(T)>0) >0
+
+ovvero parto da 0, qualunque cosa accade, male che vada rimango con la mia quantità iniziale. Il resto è tutto guadagnato.
+
+Come lo costruisco?
+W0 = 0 allora xB0 = - yS0, ovvero prendo a prestito una cifra x*B0, allora xB0 <0, perchè la investo per comprare lo stock pari a y = -x*B0/S0, ovvero viene positiva.
+Prendere a prestito == vendere bond allo scoperto, incamero una somma che devo restituire, cioè creo un debito.
+IN alternativa, vengo allo scoperto lo stock, vendo stock (quindi y è negativo perchè ho venduto allo scoperto), il ricavato l'ho usato per comprare bond.
+Solo in questi modi creo portafogli di arbitraggio.
+
+Nel modello CRR toy-model, assenza di portafogli di arbitraggio equivalgono al fatto che: 
+miglior tasso di rendimento che offre il titolo rischioso > tasso privo di rischio > peggior tasso di rendimento che offre il titolo rischioso
+ovvero r(T)+ > z(p) > r(T)-
+
+se z(p) fosse maggiore di entrambi, perchè investire su quelli rischiosi, se sono peggio?
+viceversa, se z(p) fosse peggiore, sarebbe un ragionamento analogo.
+
+Per assurdo, se abbiamo r(T)+ > r(T)- >= r(f), ho portafogli (x,y) allora potrei prendere a prestito |x|B0 (sto vendendo allo scoperto |x| quantità di bonds).
+Con questa vendita, compro y = |x|*B0/S0 quantità di stock.
+al tempo 0 ho costituito portafoglio W0 = x*B0 + y*S0 = - |x|B0 + |x|*B0/S0* S0 = 0           (debito + quello che ho in attivo)
+
+Quanto vale questo portafoglio al tempo T se mi va male?
+
+|x|*B0/S0* d*S0 = |x|d*B0 = |x|* (r(T)-  + 1)B0 (a sinistra ho quando devo ridare alla banca)
+
+Ma r(T)- >= r(f) allora tutto quello di prima è > |x|(r(f) +1)*B0 >= 0 (=0)
+
+Quanto vale questo portafoglio al tempo T se mi va bene?
+
+|x|*B0/S0* u*S0 = |x|u*B0 = |x|* (r(T)+  + 1)B0 (a sinistra ho quando devo ridare alla banca)
+
+Ma r(T)+ > r(f) allora tutto quello di prima è > |x|(r(f) +1)*B0 > 0, restituisco il debito e mi è rimasto qualcosa con probabilità p.
+
+Quindi in queste condizioni posso costruire portafoglio di arbitraggio.
+
+OSSERVAZIONE
+L'ammontare dei bond che prendo a prestito è irrilevante, funziona per qualunque x, questo vuol dire che potrei avere guadagni illimitat, basta trovare 
+r(T)+ > r(T)- >= r(f). Quindi questa condizione non può stare in piedi.
+
+
+Supponiamo, in assenza di arbitraggio, ho due portafogli: (u,v) e (x,y) con caratteristica che, al tempo T, si ha: u*B(T) è v*S(T) = x*B(T) è y*S(T)
+
+dove S e B sono v.a., quindi ho coppie di equazioni (S(T) può prendere due valori infatti, B(T) prende unico valore), infatti avrei:
+u*B(T) + v*S(T)+ = x*B(T) + y*S(T)+         e           u*B(T) + v*S(T)- = x*B(T) + y*S(T)-
+
+abbiamo x = v e y = u, mentre al tempo 0 si ha, come conseguenza, x*B0 + y*S0 = u*B0 + v*S0
+
+Riscrivendo l'equazione, arriviamo al sistema di due equazioni:
+(u-x)B(T) = (y-v)S(T)+      && (u-x)B(T) = (y-v)S(T)-
+ma allora (y-v)S(T)+ = (y-v)S(T)-  con     S(T)+ = u*S0, S(T)- = d*s0, allora l'equazione è vera se e solo se v = y e x = u, infatti per assenza di arbitraggio si ha u > d.
+
+
+
+DEFINIZIONE DI PROBABILITA' NEUTRALE AL RISCHIO
+p è sempre con la tilde, a meno che non venga specificato diversamente
+p (tilde sopra) = (p tilde, q tilde),
+p = p (S(T) = u*S0)             q tilde = p(S(T) = d*s0)
+
+S0 = 1/(1 + r(f)) E[S(T)] = 1/(1+r(f))(u*S0*p   + d*S0*q)
+P(E) = 0 se e solo se P tilde(E) = 0, nel binomiale è irrilevante, ma nei modelli più complessi essa è una condizione importante.
+
+
+Se c'è una probabilità neutrale al rischio, faccio la valutazione di S0 come fosse un bond, con stesso tasso non rischioso con cui sconto il bond r(f).
+IL bond dice infatti che B0 = 1/(1+r(f))*B(T)
+
+mentre normalmente avremmo:
+S0 = 1/(1 + E[r(T)) E[S(T)] = 1/(1+r(T) con barra per indicare la media)(u*S0*p   + d*S0*q) ovvero qui abbiamo tasso rischioso.
+
+Se non abbiamo paura del rischio, allora la valutazione del titolo non rischioso la faccio come quella del titolo rischioso.
+Quindi dovrò aggiungere qualcosa per compensare avversione al rischio.
+
+[VEDI FOTO PRIMA RIGA]
+l'idea è che se compro qualcosa che è rischioso, voglio compenso rispetto a qualcosa che non è rischioso, perchè sono avverso al rischio che devo compensare. Non peso le cose allo stesso modo.  Nei giochi di azzardo è il contrario, ovvero ho poche possibilità che le cose vadano bene rispetto all'andare male, ovvero non richiedo "un premio".
+
+________________________
+
+Se esiste una probabilità neutrale al rischio questa è unica (non posso averne due).
+Se ne avessi due: p tilde(p,q) e p pallino (p,q coi pallini), allora:
+S0 = 1/1 +r(f) * E[S(T)] tilde = 1/(1 +r(f)) * E[S(T)] pallino, allora le medie devono essere uguali:
+
+(S(T)+ ) p tilde + (S(T) -)* Q tilde = (S(T)+ ) p pallino + (S(T) -)* Q pallino , ed è valida se tilde e pallini sono uguali.
+______________________________________
+
+Esiste una probabilità neutrale al rischio se e solo se il mercato è libero da arbitraggi.
+
+In assenza di arbitraggi, r(T)+ > r(f) > r(T)-
+u - 1 > r(f) > d - 1
+
+se considero p tilde = (1 + r - d)/(u-d) >0         e q tilde = (u - (1+r)/(u-d) >0, con somma delle due = 1
+quindi si candida ad essere distribuzione di probabilità, è neutrale al rischio?
+
+E[S(T)] speranza tilde = p tilde *S(T)+ + q tilde * S(T)- = (1 + r(f))S0 solo applicando p e q tilde definite in quella maniera. (senza vedere che siano positive)
+metto dentro le formule di p tilde e q tilde ed arrivo a tale risultato.
+
+Vale anche il viceversa, se esiste unica probabilità neutrale al rischio => mercato libero da arbitraggi.
+Supponiamo che andiamo a prendere p tilde = (1+r-d)/(u-d)   e q tilde = (u - (1+r)/(u-d) con condizioni:
+
+xB0 + yS0 = 0       e xB(T) + y*S(T) >= 0
+
+allora p tilde e q tilde non sono maggiori o uguali a 0, e quindi non abbiamo probabilità neutrale al rischio. (dim su note)
+infatti troviamo che sia u che d sono >= (1+r) e quindi non posso costruire E[S(T)] tilde come definita sopra.
+
+Quando devo prezzare prezzo opzione, devo valutare C0 in assenza di arbitraggio, in questa maniera.
+C0 = 1/(1 + r(f))* E[C(T))] tilde, con C(T) max {St - k, 0}
+e P0 = 1/(1 + r(f))* E[P(T))] tilde con P(T) max {k - St,0}
+
+
+A livello computazionale significa che noi andiamo sul mercato, guardiamo al titolo S(T) = uS0 con prob. p oppure dS0 con prob. q
+Se fisso tempo t = 0 oggi, poi prendo mercato |_____________________________| e al tempo T = 3 mesi ho opzioni europee put e call su titolo di mercato.
+Sul mercato avremmo C0(k) e P0(k) dipendenti solo da k (T fissato).
+Se riesco a stimare r(f), u e d allora riesco a definire i prezzi, cioè calibrare il modello, sono interni al modello, anche p tilde è interno al modello, quindi non è proprio corretto parlare di stime in questi casi. r(f) invece lo stimo, non lo calibro.
+                                    
