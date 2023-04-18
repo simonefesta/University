@@ -1,0 +1,84 @@
+MODELLO DI MARKOWITZ
+Nel CRR avevamo un mercato costituito da BOND e STOCK:
+- Bond aveva evoluzione al tempo T : B_t = (1+r_f)*B0
+- Stock aveva evoluzione al tempo T: St = uS0 oppure dS0 (binomiale)
+
+Con Markowitz abbiamo un portafogli di titoli: S0, S1, ..., S_M
+S0 è il Bond (ma per convenzione si chiama S0, e non B0), con evoluzione S(T)_0 = (1+r_f)*S
+S1,.., S_M sono titoli rischiosi.
+se prendiamo quindi uno di questi al tempo 0 abbiamo S(0)_m, al tempo T S(T)_m, che è una V.A. di cui non sappiamo la distribuzione.
+Per il resto, non cambia nulla, le altre ipotesi sono uguali. Lavoro con insieme di titoli di cui non conosco la distribuzione, ma spesso si assumerà gaussiana.
+
+L'idea è: ho quantità di denaro W, al tempo 0, positiva, cioè W(0)>0.
+Quale è il modo migliore per investire? Come costruisco un portafoglio ottimale (meglio se ottimo)? (ottimo = meglio non posso fare).
+
+Si possono costruire: Portafoglio di minimo rischio (assoluto) e Portafoglio di minimo rischio per rendimento assegnato. (min 9).
+
+Abbiamo quindi ricchezza da investire W>0, voglio "Portafoglio di titoli", ovvero prendo n-upla in questo modo:
+simbolo del pigreco = (y1,...,y_M) dove y_m è quantità del titolo S_M nel portafoglio, numero di azioni che ho comprato di un certo titolo, posso comprare anche frazioni di azioni (mezza azione, pigreco azioni, etc...) e anche negativi (-sqrt(2) titoli, ovvero vendo allo scoperto).
+Quando acquisto "posizione lunga", quando vendo allo scoperto "posizione corta". Se compro un titolo, nessuno mi obbliga a venderlo, quindi posso tenerlo per tempo indefinito (lo tengo potenzialmente a "Lungo"), mentre se vendo allo scoperto (quindi c'è il broker che me lo vende e devo restituirglielo, il più presto possibile).
+y può anche essere 0, ovvero non metto titolo nel portafoglio. (min 18).
+
+*****Il valore del portafoglio******
+
+Il valore del singolo titolo W_m è "la quantità di azioni comprare moltiplicato il valroe del titolo", cioè W_m (0, y_m) = y_m * S_m(0).
+Nelle parentesi abbiamo il tempo, e la quantità di azioni. Al tempo T: W_m(T,y_m) = y_m * S_m(T). Al tempo T dipendono da variabili aleatorie.
+Questo modello punta a scegliere in maniera ottimale le compomenti y_m. Su S_m(T) NON HO INFLUENZA sul valore dei titoli, solo su y_m posso "lavorare".
+La scelta della quantità non influenza il valore dei titoli, ma generalmente non è vero, perchè chiedere tante unità di un titolo comporta una domanda che altera il suo valore. Come lo giustichiamo? L'azione di un individuo non influenza il mercato generale, siamo "poco significativi". L'unico cambiamento è l'arrivo di notizie che altera il valore di un titolo. Parliamo di variabili ESOGENE, valore non dipende dalle mie scelte. (min 26:40)
+
+Il valore del portafoglio al tempo 0 è: W(y_1,..., y_m, 0) = Sommatoria da m=1 ad M di W(y_m,0) = Sommatoria da m=1 ad M di y_m * S_m(0). Questa quantità è la mia ricchezza iniziale. FOTO 1.
+
+****Rendimento Portafoglio****** min 30.
+R_T (y_1,..., y_m,M) = W(y_1,...y_m,T) - W(y1,...,y_m,0) = Variazione tra valore finale ed iniziale. Coincide con FOTO 2
+
+Esempio: ho portafoglio con azioni ENI = 5 euro (mi rende 5 euro), e STELLANTIS = 3 euro. Allora perchè il portafoglio dovrebbe rendermi 5+3=8 ? Perchè c'è linearità, ma questa è garantita dal fatto che sul mercato NON C'È ARBITRAGGIO, sennò non è detto che sia cosi!
+
+***Peso di un titolo in portafoglio** min 36
+Noi abbiamo parlato di quantità prima (quante azioni metto nel portafoglio), il peso è un'altra cosa.
+Il peso w_m = W_m(y_m,0) / W(y_1,..,y_m,0) , il peso è definito con 'w' minuscolo, è rapporto tra valore singolo titolo rispetto alla ricchezza iniziale totale.
+
+w_m = y_m * S_m(0) / W     da cui  y_m = w_m * W/S_m(0).  C'è corrispondenza biunivoca tra pesi e quantità. FOTO 3
+Ma allora a che servono i pesi? perchè hanno struttura tale che, risolvere il problema in termini di pesi, è più facile.
+Cosa hanno i pesi, rispetto alle quantità di azioni? (min 42).
+
+La somma di tutti i pesi fa 1, le quantità di azioni NO! Sommatoria da m=1 a M di w_m = 1, questo è indicativo di una struttura di un IPERPIANO di R^m.
+Ovvero:
+S1,S2, allora (y1,y2) appartiene a R^2, passo ai pesi: (W1,W2) appartiene a R^2 se W1+W2=1, che è l'equazione di una retta.
+
+Se i titoli sono 3:
+(y1,y2,y3) appartiene a R^3, i pesi (W1,W2,W3) devono soddisfare W1+W2+W3 = 1, che è un piano passante per i versori degli assi, di R^3. FOTO 4 GRAFICO.
+Sulle note (versione 17) c'è qualche esempio. Posso riscrivere tutto come: FOTO 4 FORMULA. (spero che sulle note sia scritto un pò meglio).
+
+min 52 - introduco l'insieme di tutte le n-uple appartenenti ad R^M tale che la somma w_m=1), tale insieme è INSIEME DEI PORTAFOGLI FATTIBILI (FEASIBLE). FOTO 5
+Sto riducendo la dimensione, da M ad M-1.
+Torniamo al rendimento: R_m(T) = W_m(y_m,T) - W_m(y_m,0) = y_m * ( S_m(T)- S_m(0) ).
+
+Il tasso di rendimento r_m(T) è FOTO 6. È più interessante perchè proporziona il guadagno rispetto a quanto ho investito, la condizione y_m != 0 serve per avere il denominatore diverso da 0. Si può chiamare anche "Rendimento del titolo". E' una V.A., il "tasso di rendimento ATTESO" è la speranza del tasso di rendimento.
+Si indica con: FOTO 7, in FOTO 7 c'è anche variazione tasso rendimento etc...
+
+min : 1:05 FOTO 8, rendimento in funzione dei pesi == rendimento in funzione delle quantità. Se sono v.a. posso parlare di varianza! Chi è ? FOTO 9.
+
+******Insieme convesso e Funzione convessa***** min: 1.26
+(x1,...,xm) (y1,...,ym) appartiene a S (S con una sbarra) appartenente a R. 1:27:18
+La funzione convessa più semplice è la retta, ma non è strettamente convessa, quello lo è la parabola, perchè la corda che unisce due punti è maggiore uguale dei punti della funzione (1:29:08).
+
+f( alfa(x1,...,xm) + (1-a)(y1,..,ym)) <= alfa*f + (1-a)*f, nella parabola strettamente convessa è minore stretto.
+
+Se prendo f:R^M -> R, convessa, ed S barra (tipo $) sottoinsieme convesso di R^M. voglio il min (x1,..,xm) appartente a $ {f(x1,...,xm)} o non ha soluzione, o la ha locale ma vale anche globale. se strettamente convessa allora esiste sempre per il problema di minimo.
+COme si applica al nostro caso?
+(W1,...,W_M) Sommatoria *(W1,...W_M)^T  min 1:33
+Se portafogli di titoli non singolare, allora esiste unica soluzione che miniminzza il rischio di portafoglio. esiste portafoglio di rischio minimo.
+un portafoglio di titoli diventa titolo rischioso caratterizzato dal rischio del portafoglio di minimo rischio. Come si combina con titolo non rischioso? lo vedremo.
+
+
+
+
+
+
+
+
+
+
+
+
+
