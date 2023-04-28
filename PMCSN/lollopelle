@@ -1,0 +1,139 @@
+Simulazione di eventi discreti
+
+"simulare" = imitare qualcosa di finto, ma che nella realtà esiste. E' un termine vago. IL tempo è fondamentale. Inoltre studio come funzionerà qualcosa prima di realizzarlo, come i centri commerciali, simulando ad esempio casi di emergenza. Parliamo di "what if analysis". Le scelte possono essere guidate da tali simulazioni.
+
+Definiamo "modello" = simulazione di una parte del mondo che ci interessa, piu semplice del mondo stesso, perchè voglio approssimarlo. Anche i modelli possono essere complessi. Il loro obiettivo è farci fare degli studi, richiedono tempo per darci risultati, ci sono tanti fasi, e devo eseguirlo tante volte.
+"simulazione" = uso il modello creato. Posso gestire variabili, che nel modello reale sarebbero piu complesse.
+
+Un obiettivo è ridurre il tempo necessario per ridurre i tempi di simulazione. Il tempo è fondamentale, e nella simulazione vuol dire maneggiare 3 tempi:
+- wall clock time: tempo per eseguire modello (da start ai risultati).
+- tempo logico: tempo del modello, simulato nel modello. e' un tempo simulato, si muove all'interno del modello, ed è discrepante dal wall clock time (magari 1 sec qui richiede 2 ore del wall clock). 
+- tempo fisico: il tempo che sistema reale osserva, diverso dal wall clock. se < wall clock time simulo allora posso simulare piu scenari. (?)
+
+event driven: eventi avvengono possibilmente in qualsiasi istante, il modello "salta avanti" di evento in evento. Se sequenziale, estratto un evento genero il successivo, parallela riprende il "sequenziale" ma lo paralellizza con thread o core.
+
+confronto logic time vs wall clock
+su simulation ogni pallino è un evento rilevante, aperiodici. quando eseguo evento eseguo codice piu o meno complesso, perchè rappresentano cose diverse.
+eventi complessi richiedono piu tempo di "wall clock time" rispetto a eventi piu leggeri. noi vogliamo ridurre wall clock time, posto che il modello è quello.
+
+
+"simulazione guidata dagli eventi" appartiene a "programmazione guidata dagli eventi", ovvero il flow di programmazione è guidato da eventi (sensori, messaggi, azioni).
+c'è "Main loop = ciclo" in cui sistema si accorge di evento, lo estrae e lo consegna a gestore di eventi (handler), che si attiva. E' come le interrupt nei sistemi hw.
+
+GESTORE DELL'EVENTO
+è un call back asincrono, chiamabile a run time quando c'è evento di interesse per quel gestore. I gestori ricevono eventi ed eseguono logica che modifica lo stato.
+E' disaccoppiabile rispetto a quello c'è sotto. C'è un dispatcher che vede il tipo dell'evento e lo consegna a chi deve gestirlo, sto disaccoppiando dal main loop.
+IL numero di eventi è arbitrario. Se gestore occupato? devo accodarlo. La coda è necessaria.
+
+esempio slide 11
+se mi baso su eventi discreti, come modello qualcosa che ha una durata di tempo logico? (cioè mi arriva un evento,ma come faccio a dire quando finisce, se è un punto discreto?). Serve "inizio" e "fine", ovvero "ricezione" e "completamento", aventi tempi diversi. Ho quindi due classi di eventi.
+Q(t) è quante richieste vengono accodate. Graficamente ho dei gradini. Mi dice come si evolve il sistema nel tempo.
+
+12: elementi necessari
+- clock: orologio che rappresenta evoluzione evento simulato. Non continuo, salta da tempo corrente a evento successivo.
+- lista di eventi: bufferizzo eventi che non posso processare ora, ma processerò dopo. (pending event set).
+- oggetti di simulazione: sottoporzione del mio modello, che interagisce con altri oggetti mediante scambio di eventi.
+- stato simulazione: insieme di variabili che descrivono a che punto della mia simulazione mi trovo.
+- random number generator: perchè il modello è approssimato, servono per studiare evoluzione modello, che cambio sviluppo in base ai numeri generati (what if analysis).
+- sistema raccolta statistiche: devo capire cosa mi dice il sistema.
+- condizione di terminazione: istante temporale o condizione. mi dice quando fermare simulazione per studiarla.
+come li metto insieme?
+
+13: con pseudocodice
+
+- inizializzo lo stato, il clock, end<- false (simulazione non terminata), schedulo il primo evento init.
+- loop simulazione: finchè non termino, schedulo tempo prossimo evento, "process next event" (la logica è tutta qui dentro), aggiorno statistiche.
+
+Questo è thread singolo, ma se volessi farle andare più veloce?
+14: eventi relazionati, un evento può generare altri eventi, presenti o futuri (non passati). la generazione può essere non fifo (se x1 genera x3, e x2 genera x4, non è detto che x3<x4), non generare nulla, fanout>1 (genera >1 eventi). tutto ciò avviene quando processo un certo evento. con fanout>1 serve event list.
+
+15 - gestione eventi fondamentale
+il pending event set è collo bottiglia, ci vanno tutti eventi generati, da cui estraggo evento successivo da eseguire. deve garantire che il timestamp sia ordinato.
+voglio anche considerare una coda di priorità.
+
+16
+la lista concatenate (linked list) è la struttura più semplice, dalla testa estraggo evento successivo. estrazione costante, inserimento ha costo o(n), non ho garanzie su come vado a generare gli eventi, quindi devo vedere tutta la coda per inserirla.
+
+come miglioro? 17 - calendar queue
+nel calendario ad ogni giorno inserisco eventi ordinati. (concetto di giorno ed evento ordinato). il giorno è "virtuale", ovvero ci metto tutti gli eventi di quel giorno, ma di tutti i mesi dell'anno (non ho 12 fogli uno per ogni mese, ma solo 1 per tutti i mesi).
+
+19
+il giorno è detto "bucket", ci metto tutti gli eventi di quel giorno, ogni bucket copre un certo intervallo di tempo, e un evento lo metto nel bucket vedendo il timestamp.
+se elemento ha priorità p, lo metto nel bucket |p/copertura temporale di tutti i bucket| mod n
+
+ogni bucket ha >1 evento, e può essere lista ordinata. ho vettore di liste, e ogni bucket contiene sottoinsieme eventi del mio sistema.
+per inserimento, capisco subito la lista per contenere evento. come minimizzo? devo tenere liste corte, modifico "w" tale che tutte le liste siano circa lunghe uguali.
+
+quindi w deve essere tale che gli eventi siano equamente distribuite.
+
+20 - estrazione
+ho 5 bucket, da 0 a 4, tempo corrente è 63. w = 10, ogni bucket copre intervallo di 10 unità di tempo. (bucket 0 da 50 a 60, bucket 1 da 60 a 70).
+notiamo che in "0" c'è 103, e non andrebbe bene. nel bucket 1 ho 66 e va bene, posso estrarlo e processarlo.
+clock avanza, time = 66, tra 60 e 70 è vuoto, vado a 70-80, vuota, vado a 80-90, c'è evento e va bene, lo processo.
+salto a tempo 88, 195 ricade tra 90 e 100? no, dovrei eseguire prima 103 e 107. NON POSSO ESTRARLO.
+ritorno all'inizio, AGGIORNO LA COPERTURA (quindi bucket 0 va 100-110), estraggo 103, estraggo 107, e li prendo.
+faccio estrazioni in testa, per l'inserimento non mi muovo dai bucket, ma tra le liste nei bucket, con inserimento o(1).
+
+visto main.c tipo
+in una coda, inserisco un certo numero di nodi, 30k, con priorità casuale, faccio inserimenti.
+//retrieve elemetns from calendar queue
+li estraggo, studio costo inserimento ed estrazione.
+con coda lineare: 3.5 secondi per inserimento + estrazione in ordine
+con calendar queue: mezzo secondo. (65k bucket, w si ridimensiona dinamicamente, è 3 volte la distanza media tra eventi).
+
+
+29
+confronto prestazionale, miglioramento netto, ma ancora non sufficiente.
+considero ASPETTI SPAZIALI
+
+se partizionamento logico uso oggetti, se fisico uso "mondi esagonali" (tipo giochi rpg). è rappresentazione approssimata del mondo, ho celle esagonali con varie direzioni di spostamento (6 direzioni). Così studio cosa accade in ogni cella in modo individuale, e poi ci saranno interazioni. Riduco movimento supportato.
+come lo uso in un modello reale?
+
+slide 33 - personal communication service PCS
+usata per studiare RETI 3G, per vedere QoS. la cella esagonale garantisce copertura esagonale (come la cella vera e propria).
+persone si spostano casualmente nella mappa, e telefonano. Se passo da cella ad altra c'è handoff (stazioni si mettono d'accordo per trasferire chiamata). Se canale successivo occupato? casca la chiamata.
+Per ciascun canale mantengo struttura dati con tutte le info necessarie. Tante chiamate -> tanti record. Tali record li organizzo in lista.
+
+esempio codice celle con calendar
+- chiamata termina nella stessa cella, o si sposta in altra cella.
+- posso schedulare eventi contemporanei, ma mai passati.
+
+posso fare di meglio? parallelizzo
+abbiamo visto componente temporale e spaziale.
+voglio massimizzare speed-up, non massimizzando l'efficienza delle risorse. voglio essere il più veloce possibile.
+
+sfrutto divisione spaziale per partizionare stato simulazione, non ho un unico stato, ogni oggetto di simulazione ha stato privato disgiunto. unendoli tutti ho unico stato. Mi muovo verso verso rappresentazione spazio-temporale, ogni oggetto ha timeline indipendente. coda degli eventi è stata suddivisa. Oggetto1 estrae ciò che vede nella sua coda, e può mandare eventi verso altri. Con più code, come capisco l'evento successivo? sincronizzarli è complesso computazionalmente.
+se li simulo ognuno per conto proprio? perdo la correttezza, potrebbe essere tutto a caso. (ogni oggetto ha propria visione del tempo). Ho violato la causalità.
+Se un evento arriva dopo, ma era fissato prima, la soluzione è fare rollback per aggiustare la causalità. Ciò avviene in caso di messaggi STRAGGLER (un msg ha timestamp = 8, io sto a ts = 15, devo tornare indietro). Però se io ho fatto cose nel mentre? mando antimessaggio, ovvero informo altre code che devono fare pure loro rollback (usando i log). Tale approccio è detto OTTIMISTICO. finchè non c'è inversione di priorità posso estrarre localmente miei eventi ed andare avanti, se va male rimetto tutto a posto. come? con due code azionali: coda stati e coda msg mandati in output.
+
+se da input queue estraggo msg, mantengo "output queue" con antimessaggio, faccio snapshot del msg a quel tempo. quando arriva al successivo, non butto via il precedente (non so se ci saranno errori). mantengo stato dei processi. se arriva straggler? torno dietro in input queue, all'ultimo evento corretto (il più grande prima dello straggler). butto via in "state queue" gli eventi errati, e gli "output queue" diventano antimessaggi, li consegno e svuoto output queue. Input queue ora può andare avanti.
+
+Quanto funziona bene 'sta cosa? ROOT-SIM si basa su tale paradigma, compatibile con eventi discreti.
+lo applico (macchina lollopelle 4 core, 4 thread, 256 code) : 2.6 secondi. Ed ho solo 4 thread.
+
+statisticamente funziona perchè l'inizializzazione dello stato di simulazione, il seed usato fa parte dello stato. con rollback annullo anche parte di generazione di numeri pseudorandom, come se non li avessi mai estratti.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
