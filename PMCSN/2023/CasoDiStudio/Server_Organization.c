@@ -8,7 +8,7 @@
                                        /* terminal are disabled          */
 #define START         0.0              /* initial time                   */
 #define STOP      20000.0              /* terminal (close the door) time */
-#define INFINITY   (100.0 * STOP)      /* must be much larger than STOP  */
+#define UPPERBOUND   (100.0 * STOP)      /* must be much larger than STOP  */
 
 double lambda = 4.0;
 double mu = 1.5;
@@ -150,7 +150,7 @@ void server_organization_1(int seed, analysis *result){
   PlantSeeds(seed);
   t.current    = START;                               /* set the clock                         */
   t.arrival    = GetArrival(lambda / servers_num);    /* schedule the first arrival            */
-  t.completion = INFINITY;                            /* the first event can't be a completion */
+  t.completion = UPPERBOUND;                            /* the first event can't be a completion */
 
   while ((t.arrival < STOP) || (number > 0)) {
     t.next = Min(t.arrival, t.completion);            /* next event time   */
@@ -166,7 +166,7 @@ void server_organization_1(int seed, analysis *result){
       t.arrival     = GetArrival(lambda / servers_num);
       if (t.arrival > STOP)  {
         t.last      = t.current;
-        t.arrival   = INFINITY;
+        t.arrival   = UPPERBOUND;
       }
       if (number == 1)
         t.completion = t.current + GetService(mu);
@@ -178,7 +178,7 @@ void server_organization_1(int seed, analysis *result){
       if (number > 0)
         t.completion = t.current + GetService(mu);
       else
-        t.completion = INFINITY;
+        t.completion = UPPERBOUND;
     }
   } 
 
@@ -192,7 +192,7 @@ void server_organization_1(int seed, analysis *result){
   result->utilization = area.service / t.current;
 
   if(DEBUG){
-    printf("\nfor %ld jobs the service node statistics are:\n\n", result->jobs);
+    printf("\nfor %d jobs the service node statistics are:\n\n", result->jobs);
     printf("   average interarrival time = %lf\n", result->interarrival);
     printf("   average wait ............ = %lf\n", result->wait);
     printf("   average delay ........... = %lf\n", result->delay);
@@ -284,7 +284,7 @@ void servers_organization_2(int seed, analysis *result){
   result->utilization = (total_service / servers_num) / t.current;
 
   if(DEBUG){
-    printf("\nfor %ld jobs the service node statistics are:\n\n", result->jobs);
+    printf("\nfor %d jobs the service node statistics are:\n\n", result->jobs);
     printf("   average interarrival time = %lf\n", result->interarrival);
     printf("   average wait ............ = %lf\n", result->wait);
     printf("   average delay ........... = %lf\n", result->delay);
@@ -314,7 +314,7 @@ void server_organization_3(int seed, analysis *result){
   PlantSeeds(seed);
   t.current    = START;                 /* set the clock                         */
   t.arrival    = GetArrival(lambda);    /* schedule the first arrival            */
-  t.completion = INFINITY;              /* the first event can't be a completion */
+  t.completion = UPPERBOUND;              /* the first event can't be a completion */
 
   while ((t.arrival < STOP) || (number > 0)) {
     t.next = Min(t.arrival, t.completion);            /* next event time   */
@@ -330,7 +330,7 @@ void server_organization_3(int seed, analysis *result){
       t.arrival     = GetArrival(lambda);
       if (t.arrival > STOP)  {
         t.last      = t.current;
-        t.arrival   = INFINITY;
+        t.arrival   = UPPERBOUND;
       }
       if (number == 1)
         t.completion = t.current + GetService(servers_num * mu);
@@ -342,7 +342,7 @@ void server_organization_3(int seed, analysis *result){
       if (number > 0)
         t.completion = t.current + GetService(servers_num * mu);
       else
-        t.completion = INFINITY;
+        t.completion = UPPERBOUND;
     }
   }
 
@@ -356,7 +356,7 @@ void server_organization_3(int seed, analysis *result){
   result->utilization = area.service / t.current;
 
   if(DEBUG){
-    printf("\nfor %ld jobs the service node statistics are:\n\n", result->jobs);
+    printf("\nfor %d jobs the service node statistics are:\n\n", result->jobs);
     printf("   average interarrival time = %lf\n", result->interarrival);
     printf("   average wait ............ = %lf\n", result->wait);
     printf("   average delay ........... = %lf\n", result->delay);
