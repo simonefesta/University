@@ -12,9 +12,9 @@ Se molte persone vogliono un bond, si può elevare il prezzo del bond. Ovviament
 I tassi su scadenze a breve sono più alti rispetto a tassi su scadenze lunghe.
 In figura vediamo *inversione dei tassi*, perchè sul lungo termine vediamo come questi tassi diminuiscono. Questo perchè il mercato è incerto rispetto al futuro, e sul breve vogliono una forte remunerazione per prestare i soldi allo stato.
 
-Vediamo un'altra curva dei tassi di interesse, dal 4/01/21 al 15/01/2021. 
+Vediamo un'**altra curva** dei tassi di interesse, dal 4/01/21 al 15/01/2021. 
 
-![8070dea8-06bf-4756-a170-1f24013ac76e.jpeg](/home/festinho/Scaricati/8070dea8-06bf-4756-a170-1f24013ac76e.jpeg)
+![](/var/folders/_p/3wnzmzzj6q3djg3_fgyjqmb40000gn/T/ru.keepcoder.Telegram/telegram-cloud-photo-size-4-5976777580767984967-y.jpg)
 
 Qui è una curva naturale. I tassi a breve remunerano meno dei tassi a lunga. Questo è il comportamento naturale, non quello di prima. In figura c'è un buco, i dati mancano, posso allora lasciare il buco o interpolare.
 
@@ -22,13 +22,13 @@ Il prof ha raccolto dei siti di riferimento, dove ad esempio spiegano i tassi di
 Per altri questa associazione non è vera. Sul sito *FRED* vediamo lo **SPREAD**, che fa ben vedere fenomeno dell'inversione, ovvero dove i tassi a 2 hanno superato di rendimento i tassi a 10 anni. Lo spread fa la differenza tra questi due, non è un grafico dei tassi, bensì dello spread. Un esempio è lo spread BTP-Bund, ovvero tasso interesse nostro vs tasso interesse tedesco. Se spread sale, allora noi per pagare il nostro debito, dobbiamo pagare interessi più alti, e ci indebitiamo ancora di più. Viceversa, se scende, ci indebitiamo di meno.
 Un investitore deve tenere conto di tali fattori. Chi investe sul debito pubblico italiano, lo fa consapevole del rischio rispetto al debito pubblico tedesco, ma con rendimento più elevato. **Rendimenti alti associati a rischio alto, rendimento basso associato a rischio basso**, è una *legge del mercato*. Tale grafico può essere utile nei progetti.
 
-![e5019127-9293-4336-ae86-0beba5ae5cdb.jpeg](/home/festinho/Scaricati/e5019127-9293-4336-ae86-0beba5ae5cdb.jpeg)
+![](/Users/festinho/Library/Group%20Containers/6N38VWS5BX.ru.keepcoder.Telegram/appstore/account-5986516714030884589/postbox/media/telegram-cloud-photo-size-4-5976777580767984971-y.jpg)
 
 Altro sito: **Tesoro americano FedInvest**
 
 Posso vendere e comprare titoli americani. E' un sito già visto. Specificando una data, vediamo i prezzi dei titoli in tale data. Questi titoli hanno un codice *CUSIP*, un *tipo*, se rilascia cedole (*rate*), scadenze. Il primo titolo non è stato acquistato, perchè si acquistava il 3 gennaio (lo abbiamo scelto noi nel motore di ricerca del sito) e maturava il 5 gennaio. Ovviamente il rendimento era certo, ma era anche bassissimo. Più aumenta maturità, più diminuisce il prezzo *end of day*. Scorrendo la lista, troviamo anche *Market Based Note*, che rilascia cedole, quindi mi aspetto un certo *rate*(cedola) come remunerazione, in corso di vita del titolo. Sono remunerato in corso d'opera. Il prezzo *end of day* ha un rialzo. Il tasso cedolare è la cedola in funzione del valore nominale del titolo. Su 100€ prendo 1,5% ogni tot mesi. 
 
-![4191d6d0-0157-474b-a9e2-14c742244e12.jpeg](/home/festinho/Scaricati/4191d6d0-0157-474b-a9e2-14c742244e12.jpeg) 
+![](/Users/festinho/Library/Group%20Containers/6N38VWS5BX.ru.keepcoder.Telegram/appstore/account-5986516714030884589/postbox/media/telegram-cloud-photo-size-4-5976777580767984972-y.jpg) 
 
 Esempio: Prendo un titolo che scade tra 10 anni, ogni 6 mesi paga cedola del 2%. Se titolo paga 100 a 10 anni, ogni 6 mesi ricevo 2 dollari, e alla fine dei 10 anni ricevo 100+2 dollari. Quale è il prezzo da pagare per questo titolo? Prendo il nominale 100, divido per 1+r, dove r è tasso privo di rischio oggi. Ogni 6 mesi prendo 2 dollari. Ovvero, ipotizzando che tasso privo di rischio rimanga invariato nei 10 anni:
 Parto dal tempo 0, voglio stimare quello che avrò tra 6 mesi, ovvero devo scontare tasso di interesse a 6 mesi, ma poichè ho tasso annuale, divido per 2. L'esponente è in funzione del mese (qui sotto è mese 1 perchè mese 1, tra 6 mesi sarà indice 6). Si tratta di **Interesse composto**. 
@@ -71,11 +71,12 @@ Il 3/01/2023 qualcuno ha comprato e venduto questo titolo, chi perchè pensava d
 
 Ovviamente quando faccio comparazione, devo usare la stessa *unità* di misura (giorni o mesi o anni alla maturità). Le approssimazioni viste sopra (conversioni con quei fattori visti prima) è molto buona, fino alla 16esima cifra decimale abbiamo stessi risultati.
 
-Noi compariamo con la Fed *Tassi in anni percentuale* non *tassi alla maturità*. [1:26] 
+La FED ci fornisce *tassi annui percentuali*, non possiamo confrontarlo con *tassi dei periodi*.
+Se ho un *tasso di rendimento alla maturità* (normalmente molto bassi, come ad esempio 0.012%), questo è un **rendimento puro**, ovvero quanto mi rende il titolo considerata la durata dell'investimento. Per confrontarli con altri investimenti, devo trasformarli in *tassi annuali/mensili*. Lo si fa mediamente la formula: $(1+r_A)^T=1+r_T$ con $r_A$ tasso annuale ed $R_T$ tasso del periodo. Allora $r_A=(1+r_T)^{\frac{1}{T}}-1$ con $\frac{1}{T}$ è il periodo valutato in anni, T era 7 giorni, lo devo trasformare in anni.
 
-Tasso sulla compravendita. Più mi allontano dal 3/01/23 (inizio) più è in crescita. Quelli di prima erano i tassi della FED, riferiti a diverse maturità, sulla base dello storico. Qui i tassi partono tutti da stessa data. E' un grafico *forward looking*, quello della FED no.
+#### Tasso sulla compravendita.
+
+Più mi allontano dal 3/01/23 (inizio) più è in crescita. Quelli di prima erano i tassi della FED, riferiti a diverse maturità, sulla base dello storico. Qui i tassi partono tutti da stessa data. E' un grafico *forward looking*, quello della FED no.
 Stiamo dicendo che oggi, sul prestito con scadenza ../11/2023 rispetto alla data iniziale, avrò un tasso di circa 4.8%, ovvero dopo circa 11 mesi. Devo valutare questi 11 mesi con i dati della FED riferiti al 3 gennaio, cioè far partire i dati della FED da questo periodo, vedere il tasso dopo 11 mesi e confrontarlo.
 
-![750f956c-8519-4aef-9e8b-67a9fba82760.jpeg](/home/festinho/Scaricati/750f956c-8519-4aef-9e8b-67a9fba82760.jpeg)
-
-
+![](/Users/festinho/Library/Group%20Containers/6N38VWS5BX.ru.keepcoder.Telegram/appstore/account-5986516714030884589/postbox/media/telegram-cloud-photo-size-4-5976777580767984985-y.jpg)
