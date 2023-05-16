@@ -32,6 +32,7 @@ Nelle forme prodotto aperte, le marginali già sono in forma prodotto, nel caso 
 $\pi(n_1,...,n_M) = \frac{1}{G(n)}\prod_{i=1}^N f_i(...)$ con $f_i$ formula dipendente dal centro i. La funzione G serve per normalizzare ad 1.
 Voglio probabilità del centro i di contenere n job, ovvero $P_i(n) = \sum_{\bar{s}: n_i=n }\pi(\bar{s})$
 
-
+Esistono algoritmi per calcolare gli indici senza necessità della soluzione.
+Noi vedremo l'algoritmo di **Mean Value Analysis**, perchè molto semplice e diffuso (accettato in ambiti industriali).
 
 
