@@ -117,4 +117,7 @@ Se considero il sottospazio di Hilbert $L^2(\Omega_n, \R)$ con $\Omega_n = (\Ome
 
 Grafico: la distanza dal centro alla proiezione di X, l'oggetto ha distanza minima possibile. Distanza minima $||X-Y||^2 = <X-Y,X-Y> = E[(X-Y)^T(X-Y)]$ perchè trattiamo vettori, se caso reale è al quadrato. (M=1). 
 
+Presa $(X_t)_{t \in R_T}$, e una serie storica fino a 't', voglio predirre il suo futuro. Come faccio? Costruisco processo stocastico di cui la serie storica può essere vista come una traiettoria. La difficoltà è dell'overfitting, ok per il passato, meno per il futuro. Deve carpire le proprietà nell'insieme, non punto per punto.
+La predizione sarà $E[X_{t+h}|F_t]$, una banda di predizione (non una traiettoria precisa.) Per quanto riguarda la distanza dei minimi quadrati, questo è il meglio che posso fare.
+
 
