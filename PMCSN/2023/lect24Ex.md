@@ -6,14 +6,18 @@ Iniziamo con lo scrivere i flussi in entrata:
 
 $\{ \lambda_1= \gamma + \lambda_2$
 $\{\lambda_2 = (1-p)\lambda_1$
+
+Sostituendo $\lambda_2$ in $\lambda_1$ otteniamo:
 $\lambda_1= \frac{\gamma}{p}$ ; $\lambda_2=\frac{\gamma (1-p)}{p}$
-equazioni:
+
+
+La product form è data dalle equazioni:
 
 $\pi(n_1,n_2) = \pi_1(n_1) \pi_2(n_2)$
 $\pi_2(n)=(1-\rho_i)\rho_i^{n_i}$
 Le visite sono:
 
-$v_1=1/p$ e $v_2=(1-p)/p$
+$v_1= \frac{\lambda_1}{\gamma} =\frac{1}{p}$ e $v_2= \frac{\lambda_2}{\gamma} = \frac{(1-p)}{p}$
 
 Parametri: $\gamma= 1.3 j/s$, $\mu_1= 30j/s$, $\mu_2=25 j/s$
 Nel caso bilanciato, cioè $p=0.5$, il 50% cicla.
