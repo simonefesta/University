@@ -10,7 +10,6 @@ $\{\lambda_2 = (1-p)\lambda_1$
 Sostituendo $\lambda_2$ in $\lambda_1$ otteniamo:
 $\lambda_1= \frac{\gamma}{p}$ ; $\lambda_2=\frac{\gamma (1-p)}{p}$
 
-
 La product form è data dalle equazioni:
 
 $\pi(n_1,n_2) = \pi_1(n_1) \pi_2(n_2)$
