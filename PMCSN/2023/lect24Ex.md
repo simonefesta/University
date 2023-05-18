@@ -35,8 +35,6 @@ Voglio probabilità del centro i di contenere n job, ovvero $P_i(n) = \sum_{\bar
 Esistono algoritmi per calcolare gli indici senza necessità della soluzione.
 Noi vedremo l'algoritmo di **Mean Value Analysis**, perchè molto semplice e diffuso (accettato in ambiti industriali).
 
-
-
 ### Mean Value Analysis
 
 Essa si basa sulle stesse ipotesi di BCMP, ovvero accettiamo *FIFO, esponenziale*, *PS*, *LIFO con prelazione*, ed *IS*.
@@ -44,7 +42,6 @@ Definiamo il numero di job $ \doteq N$ e il numero dei centri $\doteq M$.
 Siamo sempre in un contesto di reti chiuse. 
 
 > Gli indici dipendono *sempre* da N, anche se non sempre esplicitato.
-> 
 
 Devo considerare un singolo centro $i$, e il tempo di risposta medio di un centro nella rete ci dice quanto tempo spende un job nel centro $i$.
 Vogliamo quindi calcolare $E(t_i(N)) = E(s_i) + E(a_i(N))E(s_i)$
@@ -76,8 +73,6 @@ $ $            $\downarrow-----0.7---$
 $\rightarrow$ ||||||O$_1$ $\rightarrow$ ||||||O$_2$ $\rightarrow$ ||||||O$_3$ $\uparrow$
 
 $\uparrow$ $\leftarrow----------0.3- \downarrow$
-
-
 
 $E=\{ (3,0,0), (2,1,0),(2,0,1),(1,2,0),(1,1,1),(1,0,2)(0,3,0)...\}
 $
@@ -124,11 +119,10 @@ for n=1 until 3 do    
  n=1 {E(t_1)=1, E(t_2)=2, E(t_3)=2} 
      { lambda_1(1) = 1/(1+3.33+0.5+3.33*0.5) = 0.230769
        E(n_1(1)) = lambda_1(1)E_1(t(1))=0.230769
-     
+
  n=2 {E(t_2)=1, E(t_2)=0.5, E(t_3)=0.5}
       lambda_2(1) = 1/(0.3+0.5+0.5) = 0.769231
        E(n_2(1)) = lambda_2(1)E_2(t(1))=0.384615
-       
 ```
 
 Troviamo i seguent indici:
@@ -161,3 +155,7 @@ Tempo di ciclo rispetto a 1:
 $E(t_{c,1}(3))= E(t_{2,1}(3)) + E(t_1(3))= 7.41 \;s$
 
 $E(t_{c,2}(3))= v_{1,2}E(t_1(3)) + v_{3,2}E(t_3(3))+ v_{2,2}E(t_2(3)) = 2.23 \; s$
+
+### SLIDE MVA
+
+p.14, non posso applicare Little a $\lambda_i(n)$, perchè dovrei conoscere $E(n_i(n)) $ e $E(t_i(n))$ che però essendo iterativo ancora non posso conoscerlo.
