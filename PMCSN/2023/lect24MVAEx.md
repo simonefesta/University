@@ -37,7 +37,8 @@ Noi vedremo l'algoritmo di **Mean Value Analysis**, perchè molto semplice e dif
 
 ### Mean Value Analysis
 
-Essa si basa sulle stesse ipotesi di BCMP, ovvero accettiamo *FIFO, esponenziale*, *PS*, *LIFO con prelazione*, ed *IS*.
+Essa si basa sulle stesse ipotesi di BCMP, 
+ovvero accettiamo *FIFO, esponenziale*, *PS*, *LIFO con prelazione*, ed *IS*.
 Definiamo il numero di job $ \doteq N$ e il numero dei centri $\doteq M$.
 Siamo sempre in un contesto di reti chiuse. 
 
@@ -58,7 +59,7 @@ che è un ricorsione, in cui vediamo che:
 $N=0    E(n_1(0)) = E(n_2(0))=,...,=E(n_M(0)) = 0$
 
 Quindi a $N=1$, avrò $E(n_i(N-1))= E(n_i(0))=0$
-e quindi $E(t_i(N=1)= E(s_i)$
+e quindi $E(t_i(N=1))= E(s_i)$
 
 Possiamo ricavare il throughput del centro $i$, $\lambda_i(N)$, ma ci serve $E(n_i(N))$ per usare Little, che non posso sapere, perchè essendo la formula ricorsiva conosco solo gli indici *passati*.
 
@@ -68,18 +69,15 @@ $E(n_i(n)) = \lambda_i(n)E(t_i(n))$
 
 Esempio:
 
-$ $            $\downarrow-----0.7---$
+![1199acd8-801e-4ffb-95e0-da169b908948.jpeg](/home/festinho/Scaricati/1199acd8-801e-4ffb-95e0-da169b908948.jpeg)
 
-$\rightarrow$ ||||||O$_1$ $\rightarrow$ ||||||O$_2$ $\rightarrow$ ||||||O$_3$ $\uparrow$
+Definiamo $M=3,\;N=3,\;\mu_1=1 \;j/s,\;\mu_2=\mu_3=2 \;j/s$
+Valutiamo lo spazio degli stati:
 
-$\uparrow$ $\leftarrow----------0.3- \downarrow$
-
-$E=\{ (3,0,0), (2,1,0),(2,0,1),(1,2,0),(1,1,1),(1,0,2)(0,3,0)...\}
+$E=\{ (3,0,0), (2,1,0),(2,0,1),(1,2,0),(1,1,1),(1,0,2),(0,3,0),(0,2,1),(0,1,2),(0,0,3)\}
 $
 
-Sono 10 stati. Definiamo $M=3,N=3,\mu_1=1j/s,\mu_2=\mu_3=2j/s$
-
-Le prestazioni dei centri 2 e 3 saranno uguali, avendo stesso tasso e stesse visite.
+Sono 10 stati perchè $\binom{N+M-1}{M-1}= \binom{5}{2} =\frac{5!}{3!2!} = \frac{5 \cdot 4 \cdot 3!}{3!2!} = 10$. Le prestazioni dei centri 2 e 3 saranno uguali, avendo stesso tasso e stesse visite.
 Scrivo sistema di equazioni linearmente indipendenti.
 
 $y_1=0.3y_3$
@@ -88,12 +86,9 @@ $y_2=y_1 + 0.7 y_3$
 
 $y_3=y_2$
 
-Potrei trovare anche matrice routing 3x3
-
-$0, 1,0$
-$0,0,1$
-
-$0.3,0.7,0$
+Potrei trovare anche matrice routing 3x3:
+$\begin{pmatrix} 0 & 1 & 0\\ 0 & 0 & 1 \\ 0.3 & 0.7 & 0  \end{pmatrix}
+$
 
 che posso abbreviare in $\bar{y}=\bar{y}P$
 
@@ -101,43 +96,95 @@ Devo fissare *arbitrariamente* un valore nel sistema delle visite, fisso $y_3=1$
 
 Troviamo: $y_1=0.3, y_2=1,y_3=1$
 
-Vogliamo calcolare le visite.
-$v_{1,1}=1, v_{2,1}=3.3333= v_{3,1}=3.3333$
+Vogliamo calcolare le visite **rispetto al centro 1**.
+$v_{1,1}=1, v_{2,1}= \frac{y_2}{y_1}= 3.3333= v_{3,1}=\frac{y_3}{y_1}= 3.3333$
 
-Questo è perchè ho preso 1 come punto di osservazione. Se cambiassi col centro 2:
+Questo è perchè ho preso 1 come punto di osservazione. Se cambiassi col **centro 2**:
 
-$v_{2,2}=v{3,2}=1, v_{1,2}=0.3$
+$v_{2,2}=v_{3,2}= \frac{y_2}{y_2}=1, \;v_{1,2}=\frac{y_2}{y_1}=0.3$
 
 Rispetto al centro 3? uguali.
 
-$v_{1,3}=0.3/1=0.3, v_{2,3}=v_{3,3}$=1
+$v_{1,3}=0.3,\; v_{2,3}=v_{3,3}$=1
 
-`
+Adesso procediamo con gli indici di prestazione per i vari centri, partendo dalla presenza di $1 \; job$:
 
-```
-for n=1 until 3 do    
- n=1 {E(t_1)=1, E(t_2)=2, E(t_3)=2} 
-     { lambda_1(1) = 1/(1+3.33+0.5+3.33*0.5) = 0.230769
-       E(n_1(1)) = lambda_1(1)E_1(t(1))=0.230769
+### $n=1 $
 
- n=2 {E(t_2)=1, E(t_2)=0.5, E(t_3)=0.5}
-      lambda_2(1) = 1/(0.3+0.5+0.5) = 0.769231
-       E(n_2(1)) = lambda_2(1)E_2(t(1))=0.384615
-```
+Calcoliamo il tempo di risposta medio, per ogni centro, partendo da *1 job*.
 
-Troviamo i seguent indici:
-$E(t_1(3))= 1.421052 \;s; E(t_2(3))=0.8994737=E(t_3(3))
-$
+$E(t_1(1))=E(s_1)(1+E_{n_1}(0)) = 1 \cdot(1+0)=1$  
 
-$\lambda_1(3)=0.406176, \lambda_2(3)=\lambda_3(3)=1.353919 \;j/s$
+$E(t_2(1))=E(s_2)(1+E_{n_2}(0))= 0.5 \cdot(1+0)= 0.5$  
 
-$E(n_1(3))=0.577197, E(n_2(3))=E(n_3(3))=1.211402$
+$E(t_3(1))=0.5$
+
+Questi primi tre risultati derivano dal fatto che, per $n=1$ abbiamo $E(t_j(1))=E(s_i)=1/\mu_i$
+
+Calcoliamo le **entrate rispetto al centro 1**:
+
+$\lambda_1(1)=\frac{1}{1 \cdot 1+3.33 \cdot0.5 +3.33 \cdot 0.5} = 0.230769$ 
+avendo al denominatore $\sum_{j=1}^Nv_{j,i}E(t_j(n))$. 
+
+Poichè $n=1$, ho $E(t_j(1)) = E(s_i)=1/\mu_i$, quindi al denominatore stiamo moltiplicando le visite rispetto *al centro 1* per i vari tassi di servizio.
+Dalle definizioni:
+
+$E(n_1(1))= \lambda_1(1) \cdot E(t_1(1)) = 0.230769$
+
+Analogamente, per il centro 2 e 3 si hanno:
+$\lambda_2(1)= \frac{1}{1 \cdot 0.3 + 0.5 \cdot 1 + 0.5 \cdot 1} = 0.769231 = \lambda_3(1)$
+$E(n_2)=E(n_3) = 0.3846155$
+
+### $n=2$
+
+Adesso abbiamo incrementato di 1 il numero di job, incrementiamo mano mano perchè le formule sono ricorsive, devo partire dal caso base di sistema con 0 job e mano a mano incrementare.
+
+$E(t_1(2))= E(S_1)(1+E_{n_1}(1)) =1 \cdot (1+0.230769) = 1.230769 $
+
+$E(t_2(2))=E(S_2)(1+E_{n_2}(1)) = 0.5 \cdot (1 + 0,3846155) = 0.69230775$
+
+$ E(t_3(2))=0.69230775$
+
+Mi focalizzo sul centro 1:
+$\lambda_1(2)=\frac{2}{1 \cdot 1.23 + 0.69 \cdot 3.333 + 0.69 \cdot 3.333} = 0.3430$
+
+$E(n_1(2))= 0.3430 \cdot 1.230769 = 0.4222$
+
+Passiamo ai centri 2 e 3
+
+$\lambda_2(2) = \lambda_3(2) = \frac{2}{0.3 \cdot 1.23 + 0.69 + 0.69} = 1.1435$
+
+$E(n_2(2))=E(n_3(2)) = 1.1435 \cdot 0.6923 = 0.791661$
+
+### $n=3$
+
+Per il centro 1:
+
+$E(t_1(3)) = E(S_1)(1+E_{n_1}(2)) = 1 \cdot(1+ 0.4222) = 1.4222$
+
+Per i centri 2 e 3:
+
+$E(t_2(3)) = E(t_3(3)) = E(S_2)(1+E_{n_2}(3))= 0.5\cdot(1+0.791661) = 0.8958305$
+
+Calcoliamo gli indici per il centro 1:
+
+$\lambda_1(3)= \frac{3}{1 \cdot 1.4222 + 3.33 \cdot 0.8958 +  3.33 \cdot 0.8958} = 0.406051 $
+
+$E(n_1(3)) = 0.406051 \cdot 1.4222 = 0.577197$
+
+Calcoliamo gli indici per il centro 2 e 3:
+
+$\lambda_2(3)= \frac{3}{1.422 \cdot 0.3 + 0.8958 \cdot 1 + 0.8958 \cdot 1} = 1.35244 = \lambda_3(3)$
+
+$E(n_2(3))=E(n_3(3)) = 1.3544 \cdot 0.895835 =1.211402$
+
+
 
 Che verifiche posso eseguire?
 
 * La somma delle popolazioni medie deve restituire l'uguaglianza $N=\sum_{i=1}^N E(n_i(N)) \approx 3$
 
-* Possiamo anche calcolare l'utilizzazione $U_1= 0.406176$ ed $U_2=U_3=0.67696$
+* Possiamo anche calcolare l'utilizzazione $U_1=0.406176$ ed $U_2=U_3=0.67696$ (Non ho capito come ricavarle, dovrei calcolare $1- p_i(0)$ma dovrei sapere le probabilità degli stati! Boh)
 
 Questi sono tutti indici *locali*. Possiamo parlare anche di indici *globali*, ma dobbiamo sempre scegliere un punto di osservazione, perchè la rete è chiusa.
 
@@ -155,7 +202,3 @@ Tempo di ciclo rispetto a 1:
 $E(t_{c,1}(3))= E(t_{2,1}(3)) + E(t_1(3))= 7.41 \;s$
 
 $E(t_{c,2}(3))= v_{1,2}E(t_1(3)) + v_{3,2}E(t_3(3))+ v_{2,2}E(t_2(3)) = 2.23 \; s$
-
-### SLIDE MVA
-
-p.14, non posso applicare Little a $\lambda_i(n)$, perchè dovrei conoscere $E(n_i(n)) $ e $E(t_i(n))$ che però essendo iterativo ancora non posso conoscerlo.
