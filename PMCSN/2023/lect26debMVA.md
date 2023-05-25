@@ -13,8 +13,6 @@ Vediamo il teorema degli arrivi $A_j(k)= E[n_j(k-1)]$, qui ne viene proposta una
 Essendo capacità finita l'unica soluzione è sempre con il processo di Markov.
 I grafici sono indici di prestazioni locali nei centri.
 
-
-
 ### Parte seconda di operAnOfQ
 
 Abbiamo $T, \;A_i, \; B_i, \; C_{i,j}$ con $i=1,...,K$ con K numero di server (non più M).
@@ -29,10 +27,6 @@ Se sommiamo $p_{i,0} + \sum_{j=1}^Kp_{i,j} = \frac{C_{i,0}}{C_i} + \sum_{j=1}^K 
 
 Per definizione, la frequenza di uscita dell'intero sistema è $X_0 \doteq \frac{C_0}{T}= \sum_{i=1}^K\frac{C_{i,0}}{T} \cdot \frac{C_i}{C_i} = \sum_{i=1}^K \frac{C_i}{T} \cdot \frac{C_{i,0}}{C_i} = \sum_{i=1}^KX_i \cdot p_{i,0}$
 
-
-
-
-
 $A_i \rightarrow ||||]O_{D_i} \rightarrow C_i$
        $n_i(t)$
 
@@ -40,6 +34,12 @@ $\bar{n_i}= E(n_i) = \frac{W_i}{T}$ ovvero sto calcolando area diviso il tempo. 
 
 Il tempo di risposta medio per servire il singolo job è $R_i=\frac{W_i}{C_i} $ cioè il tempo per *singolo job* accumulato dalla risorsa $i$. $W_i$ è tutto il tempo occupato dalla risorsa $i$ durante l'osservazione, ma è di tutti i job, per questo dividendo per i completamenti, mi sto concentrando sul *singolo job*.
 Possiamo notare che $\bar{n_i}= \frac{W_i}{T} \cdot \frac{C_i}{C_i} = X_i \cdot R_i$ cioè **Little vale indipendentemente dalla condizione di job flow balance.** Little vale di più rispetto ai casi in cui è stato verificato.
+
+<img src="file:///var/folders/_p/3wnzmzzj6q3djg3_fgyjqmb40000gn/T/TemporaryItems/NSIRD_screencaptureui_JnSVHs/Screenshot%202023-05-25%20alle%2015.33.11.png" title="" alt="Screenshot 2023-05-25 alle 15.33.11.png" width="370">
+
+
+
+
 Supponiamo $A_i= 7 \; j, B_i= 16 \; s,C_i = 10 \;j$, abbiamo:
 $n_i(0)=3$
 $n_i(20) = n_i(0)+A_i-C_i=0$ coerente con la figura!
