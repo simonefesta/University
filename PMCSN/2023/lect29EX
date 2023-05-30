@@ -24,6 +24,6 @@ Capacità finita, stazionarietà. mu = 1/0.5 = 2, non avrei problemi in ogni cas
 Essendo la catena finita, uso catena di Markov con 3 stati: 0   1    2 , vado avanti con lambda, indietro con mu, con equazioni:
 pi0 lamdba = pi1 mu ,..., -> pi1= pi0 lambda/mu = pi0* 0.25
 la pi2 devo scriverla come 1 - pi0 - pi1 (uso normalizzazione)
-0.7619 pi1= 0.1905 pi2=0.476
+0.7619 pi1= 0.1905 pi2=0.0476
 
 come calcolo varianza? media variabile^2 (1pi1 + 2^2pi2) - quadrato media = 0.29928
