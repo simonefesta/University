@@ -34,7 +34,9 @@ Un singolo job avente interferenza massima ha throughput $\frac{1}{ND+Z}$. Se ci
 
 Graficamente avremmo:
 
-<img src="file:///home/festinho/Scrivania/4490465f-3bcd-45fe-b5ff-16455d8eccc4.jpeg" title="" alt="4490465f-3bcd-45fe-b5ff-16455d8eccc4.jpeg" width="506">
+
+
+<img title="" src="file:///home/festinho/Scrivania/0d452453-949d-4a10-b4f0-8700802a12f3.jpeg" alt="0d452453-949d-4a10-b4f0-8700802a12f3.jpeg" width="459">
 
 
 
@@ -52,7 +54,6 @@ Facciamo altre osservazioni:
   - prima di $N^*$ l'andamento è dato da $\frac{N}{D+Z}$, 
   
   - dopo $N^*$ non posso andare oltre $\frac{1}{D_{max}}$
-    
 
 * Se $Z=0$ allora il sistema è *chiuso* con *k* centri connessi e con *N* job.
 
@@ -141,3 +142,35 @@ Rete aperta, se sono noti i tempi di risposte $R_0,R_1,R_2$, e volessimo sapere 
 Anche se il tempo è un pò vago, le visite risolvono ogni dubbio, e ci permette di applicare la la legge del tempo di risposta.
 Un'idea della risposta è questa: visito il centro 0, e vado poi nel centro 1.
 Poi ritorno al centro 0, ma stavolta visito al centro 2. Quanto ci ho messo? il tempo espresso sopra!
+
+##### Esercizio 6
+
+<img src="file:///home/festinho/Scrivania/7e3b5870-bbb2-4fc0-8c5f-9cae0db8c5e6.jpeg" title="" alt="7e3b5870-bbb2-4fc0-8c5f-9cae0db8c5e6.jpeg" width="432">
+
+Nel primo sistema viene specificato che la coda è di *Jackson*. Questa informazione è fondamentale, perchè essendo di Jackson, quindi centri *M/M/1* esponenziali, vale il teorema di *Burke*, ovvero ciò che esce dal primo centro entra tutto nel secondo centro. Senza questi ipotesi, non posso dirlo con tale facilità.
+I dati sono: $S=0.5\;s$, $\lambda=0.4 \;trans/s$. 
+*Quale è il valore del rapporto $\frac{R_A}{R_B}?$*
+Nel contesto appena descritto, il tempo per ogni singolo $\lambda$ è $R=\frac{1}{\mu-\lambda} =\frac{1}{\frac{1}{s}-\lambda}= \frac{1}{2-0.4} = 5/8 \;s $ per ognuno dei due centri. Allora $R_A= 2R=5/4 \;s$
+Per il secondo sistema si ha $R_B=\frac{1}{1-0.4}=5/3$
+Mettendo a rapporto si ha $\frac{R_A}{R_B}=\frac{3}{4}$
+Quindi $R_A=0.75 \cdot R_B$, cioè il sistema A ha un R minore, perchè c'è meno congestione. *Due sistemi in serie usati a metà regime smaltiscono meglio di uno singolo che lavora a pieno regime.*
+
+##### Esercizio 7
+
+Sia data una coda *M/M/1/2*, ovvero di capacità 2, ovvero composta da un servente e un posto in coda.
+I dati sono: $\lambda=0.5 \; req/s$, $s=0.5\;s$
+*Quale è il numero medio di richiesto nel centro? E la varianza?*
+Trattandosi di capacità finita, si ha *stazionarietà*. Se non ci avessi fatto caso, in questo specifico esempio. non avrei avuto comunque problemi, perchè $\mu=1/0.5=2$, quindi smaltisco tutto il carico.
+Quando la coda é **FINITA**, il mio pensiero deve andare **SEMPRE ALLA CATENA DI MARKOV**. In questo caso ci sono tre stati, come a seguire:
+
+<img src="file:///home/festinho/Scrivania/1cc4ce11-d7f5-4068-8721-37489d2b1f43.jpeg" title="" alt="1cc4ce11-d7f5-4068-8721-37489d2b1f43.jpeg" width="416">
+
+Dobbiamo risolvere il sistema:
+$\pi_0 \lambda = \pi_1 \mu \rightarrow \pi_1=\frac{\pi_0 \cdot \lambda}{\mu}=\pi_0 \cdot0.25$
+
+Analogamente, seguendo gli stessi step:<br>$\pi_2 = \pi_1 \frac{\lambda}{\mu}= \pi_0\frac{\lambda^2}{\mu^2}=\pi_0 \cdot 0.625$
+
+$\pi_0$ la ottengo applicando la *Normalizzazione*, altrimenti non potrei trovarlo!
+$\pi_0+\pi_1+\pi_2=1 \rightarrow \pi_0=\frac{1}{1+0.25+0.625}=0.7619$
+
+Allora $\pi_1=0.1905$ e $\pi_2=0.0476$
