@@ -10,8 +10,6 @@ N*=5
 
 (COMPLETA)
 
-
-
 ##### Esercizio 2
 
 Throughtput del sistema con due utenti, se $D_1=1s, \; D_2=2s,\;D_3=2s$
@@ -33,8 +31,6 @@ $R_1(2)=D_1(1+n_1(1))=6/5 \;s$ ,
 $R_2(2)=14/5 \;s \; R_3(2)=14/5 \;s$
 
 Concludiamo trovando $X(2)=\frac{2}{R_1(2)+R_2(2)+R_3(2)}=5/17 \; tr/s$
-
-
 
 ##### Esercizio 17.2 p.306
 
@@ -87,10 +83,6 @@ cioè risposta dell'intero sistema rispetto al router 1.
 Potrei calcolare anche popolazioni medie, ma dovrei avere l'ipotesi che sono esponenziali (oppure se fossero processor sharing non avrei problemi).
 $E(n_1)=11.5$, $E(n_2)=1.3585$
 
-
-
-
-
 Prossima volta vediamo tempo di risposta rispetto al punto 2, e rispetto a tutto (vedo tutto come scatola nera, ovvero arriva flusso ma non so dove va in questa scatola), tempo in media per uscire da questa scatola nera?
 
 relazione tra questo tempo (che non tiene conto da dove entro) e gli altri in cui so da dove entro?
@@ -123,5 +115,3 @@ d1= 1s, d2=2s, d3=3s,
 Se il think time medio è di 21 secondi, calcolare upper bound al throughput usando analisi asintotica quando nel sistema ci sono 6 utenti. soluzione: 2/9 transazioni/unità di tempo.
 
 ----
-
-
