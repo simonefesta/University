@@ -1,5 +1,3 @@
-
-
 $\mathcal{L} = -t \cdot log(y) - (1-t) \cdot log(1-y)$ con $ y= \frac{1}{1+e^{-z}}$ e $z=\overline{w}^{T}\cdot \overline{x}$ (vettoriale)  Procediamo con: $\frac{\partial \mathcal{L}}{\partial w_J} = \frac{\partial \mathcal{L}}{\partial y}\frac{\partial y}{\partial z}\frac{\partial z}{\partial w_J}$
 
 Eseguiamo per pezzi:
