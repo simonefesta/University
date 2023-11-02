@@ -117,7 +117,7 @@ ___
 
 ____
 
-Su kernel >5 ho randomizzazione, l'indirizzo non corrisponde a ciò che mi viene fornito a compile time dalla system map.
+Su kernel $>5$ ho randomizzazione, l'indirizzo non corrisponde a ciò che mi viene fornito a compile time dalla system map.
 
 ___
 
@@ -131,8 +131,6 @@ ___
 ____
 
 Queste operazioni avvengono anche quando eseguo update kernel a livello di release.
-
-___
 
 #### Se smonto syscall rimane qualcosa?
 
@@ -170,10 +168,17 @@ Per leggere, mi piazzo allo start, applico offset, e leggo con ->
 ### TLS startup
 
 `mmap` usa `TLS_SIZE` (dobbiamo usare il meno possibile le syscall).   
-Abbiamo ptr a tabella, registriamo due variabili e richiamo la funzione (stiamo tra starters e completamento). Il *main thread* è già tirato su con la libreria, quindi questi discorsi non valgono. Qui lancio thread, lancio wrapper.
+Abbiamo ptr a tabella, registriamo due variabili e richiamo la funzione (stiamo tra starters e completamento). Il *main thread* è già tirato su con la libreria, quindi questi discorsi non valgono. Qui lancio thread, lancio wrapper.  Posso wrappare il main, quando compilo e gli giro il mio di main.
 
----
+La funzione wrapper viene indicata, nel make si ha `wrap=pthread_create` cioè se trovo questa funzione, passo il rifermento ad una funzione del tipo `wrap_pthread_create` o simile. Poi se la richiamo con `real`, invece chiamo la versione originale.
 
-- posso wrappare il main, quando compilo e gli giro il mio di main.
 
-- la funzione wrapper viene indicata, nel make si ha `wrap=pthread_create` cioè se trovo questa funzione, passo il rifermento ad una funzione del tipo `wrap_pthread_create` o simile. Poi se la richiamo con `real`, invece chiamo la versione originale.
+
+## 2 novembre 2023
+
+### run time detection of current page size for i386
+
+`unsigned long addr = 3 << 30`mi posiziono in indirizzo superiore ai 3 GB, sarà il mio addr.
+`asmlinkage int sys_page_size(){...}` asmlinkage perchè è pre-kernel 4, ritorna un intero, cioè la taglia della pagina a cui stiamo lavorando.
+Qui assumiamo che l'indirizzo `addr` abbia una rappresentazione di metadati nella tabella *identity page table*, cioè la entry sia valida, ma non è scontato!   
+La soluzione è prendere una referenza differente, cioè all'interno di `sys_page_size()`, Prendo un nuovo *addr* dentro tale funzione, ovvero l'address di `sys_page_size`, perchè tale blocco di codice parte da tale indirizzo e  corrisponde ad una pagina, o una zona, di 4MB.
