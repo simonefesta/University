@@ -291,3 +291,16 @@ con `gcc user.c vtmpo` ho stesso errore, tranne per pagina 0-esima. (non materia
 con la `read` tutta la memoria è presente in memoria fisica (da array pagine logiche), le altre sono presenti nello stesso elemento della memoria fisica, il fenomeno è **empty zero memory**, pagine su stesso frame.
 
 con `write` ho tutti frame fisici diversi, non è come prima. Materializzazione effettuata.
+
+
+
+## 8 novembre 2023
+
+### test NUMA
+
+Ho un parametro `auto-affinity`, la quale prevede di usare un processore (cioè nodo NUMA) diverso da 0. Materializziamo sul nodo NUMA 0 invece.
+Nel `main` abbiamo `set_mem_policy`, cioè ci connettiamo a specifica maschera di nodi, scelta in funzione della configurazione fatta sopra.
+Abbiamo un ciclo, scrivo in un array, materializzo pagine array, abbiamo page fault, e per la mem policy le pagine vanno nel nodo 0.Abbiamo poi un for, dove accediamo alla memoria ma poi facciamo flush da cache, quindi al prossimo accesso prendiamo dalla ram (NUMA).
+
+Avvio con `gcc numa-test.c -lnuma -DAUTO_AFFINITY` e poi `time taskset 0x1 ./a.out`, lavoriamo su una cpu che accede ad un nodo numa diverso.
+Se ricompilo senza il flag, thread non cambia affinità, siamo locali, e siamo più veloci (circa metà tempo, considerando anche tempi flush e senza traffico sui nodi NUMA).
