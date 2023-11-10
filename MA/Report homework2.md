@@ -8,8 +8,6 @@ Info utili:
 
 - simone: gemelli ascendente bilancia
 
-
-
 ### trovare main
 
 cerchiamo getMessageA con "functions", e rinominiamo con [WinMain function (winbase.h) - Win32 apps | Microsoft Learn](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-winmain) circa riga 401902
