@@ -292,8 +292,6 @@ con la `read` tutta la memoria è presente in memoria fisica (da array pagine lo
 
 con `write` ho tutti frame fisici diversi, non è come prima. Materializzazione effettuata.
 
-
-
 ## 8 novembre 2023
 
 ### test NUMA
@@ -304,3 +302,34 @@ Abbiamo un ciclo, scrivo in un array, materializzo pagine array, abbiamo page fa
 
 Avvio con `gcc numa-test.c -lnuma -DAUTO_AFFINITY` e poi `time taskset 0x1 ./a.out`, lavoriamo su una cpu che accede ad un nodo numa diverso.
 Se ricompilo senza il flag, thread non cambia affinità, siamo locali, e siamo più veloci (circa metà tempo, considerando anche tempi flush e senza traffico sui nodi NUMA).
+
+### 13 novembre 2023
+
+### Table discovery
+
+Carichiamo due moduli:
+
+Il primo è associato`message-exchange-service-intermediate-buffering`. Vogliamo meccanismo per scambiare messaggi. Chi scrive chiama syscall, il messaggio viene portato in area user. In realtà questa area user, potrebbe essere valida ma non materializzata (uguale per la  lettura), cioè può capitare page-fault. Se l'area, più o meno ampia, potremmo avere che una pagina la abbiamo e un'altra no, quindi abbiamo page-fault mentre leggiamo informazioni ad esempio. Se leggiamo, non possiamo scrivere (atomicità). La soluzione proposta è di usare una area intermedia nel kernel tipicamente directly mapped, non soggetta a page-fault. Il flag `SLAB_POISON` nella `kmem_cache_create` ci dice che la creazione viene fatta senza particolari vincoli.
+
+Nel codice, in `sys_get_message`:
+
+Facciamo check sulla size, per vedere se coerente, se lo è prendo tramite `get_zeroed` (dipende dal Buddy Allocator), in modalità Kernel. Probabilità bassa di andare in blocco. Faccio check per vedere se posso fare questo buffering intermedio. Se tutto ok, faccio copy from user,  partire dall'area indicata. Il valore di ritorno ci dice il numero di byte *non* copiati. Poi blocchiamo con mutex, e facciamo mem_copy per copiare nel kernel_buffer dove le informazioni devono essere presente. Chiamiamo anche `print_k`, aggiorniamo VALID, pari a SIZE-RET, cioè alcuni byte parte user/kernel non ci sono finiti. Alla fine libero il buffer intermedio. Non potevo usare la stack area invece del buffer così fatto? No, perchè gli stack kernel hanno taglia precisa e limitata, devono essere contenuti, sennò rischiamo di andare fuori. Nel kernel, non c'è ricorsione (sennò userei in maniera massiva lo stack), è tutto iterativo. 
+Se Kernel>4.17 usiamo simboli per rimappare syscall dentro la tabella.
+
+Lo user non fa altro che prendere nome programma-nome syscall (134 o 137)- messaggio [se scrivo]. Poi chiamiamo la syscall passata e leggiamo le info prese dal kernel.
+
+____
+
+Il secondo è  `queued-message-exchange-service`, ovvero abbiamo coda, non è che cancello ogni volta il messaggio precedente. Ci vogliono più buffer allora, li prendiamo con `kmemcache`, non la versione di default, ma la creiamo noi.
+Ha aree allocabili di una certa taglia, specifico anche il callback quando facciamo pre-reserving dal buddy-allocator, cioè per il setup dell'area di memoria. Indirizzo allineato all'area che devo consegnare. Quando si fa richiesta memoria da specifica cpu, è non c'è pre-reserving, esso viene fatto. Attualmente in `setup_area` non facicamo nulla.
+La lista in cui mettiamo i messaggi deve essere doppiamente collegata, perchè togliamo in testa e aggiungiamo in coda. Esse esistono entrambe, quindi lista mai vuota, così è più semplice da gestire, per ridurre gli if possibili. Viene fatto un insieme di check, e poi `kmemcache_alloc`, controllo che mi venga ritornata un'area. Se sì, faccio, fuori dalla sezione critica, `copy_from_user`, cosi i fault non vanno in sezione critica. Facciamo poi spinlock, e vedo se la lista è ben definita, poi aggiungo oggetto in testa, e ritorno SIZE-RET. Faccio similmente per `copy_to_user`.
+Abbiamo check anche sull'invocazione dei parametri del programma.
+
+Per usarlo, montiamo il modulo, stesse entry lasciate dal modulo precedente.
+La parte user prevede un ciclo, perchè accodiamo messaggi.
+Compito con `./a.out 134 ciao`  o `./a.out 174`
+
+Noi abbiamo usato i moduli come strumento. Il thread kernel potrebbe andare in blocco con `kmem_cache_alloc(the_cache;GFP_USER)`, se smontiamo modulo, esso viene smontato. Ma il thread che è bloccato in attesa? 
+Nel codice della funzione, c'è funzione di smontaggio `kmem_cache_destroy`, ma ciò porta ad un leak di memoria, inoltre rimuovo allocatore, ma non so se è stato correttamente rimosso.
+
+Page table sfruttabili per arrivare direttamente in memoria. Se parametro è oltre addr_limit, sfrutto questo espediente.
