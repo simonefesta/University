@@ -1,5 +1,9 @@
 # Coding part
 
+## Meltdown
+
+da root scrivo password su indirizzo kernel space, ritorna [password, indirizzoKernelUsato]. Da altro terminale, senza root, con Meltdown, riesco a leggere da questo indirizzo, però lo devo conoscere. Comunque sia, poiché ciascun byte che viene letto dal kernel space può assumere 256 valori possibili, l’array A dovrà essere composto da 256 entry differenti. Si tratta di un attacco statistico: in realtà, i tempi di accesso alla cache e alla memoria RAM non sono deterministici; uno stesso accesso talvolta può risultare più lento, talvolta può essere più veloce, dipendentemente dallo scheduling delle istruzioni a livello hardware. Il successo dell’attacco è funzione anche di quanto differisce il tempo di accesso al valore memorizzato in cache da tutti i tempi di accesso agli altri valori che invece devono essere recuperati direttamente dalla RAM. Come detto più volte, in ISA non avremo nulla, ma vedremo dei residui micro-architetturali. La morale è che, sul processore, anche se divento offending io continuo lo stesso ad eseguire. Solo alla fine, vedendo il bit di trap cancello tutto. Il vantaggio di tale approccio risiede nel fatto di limitarmi all’utilizzo di un solo bit per la gestione di questi eventi. Cioè, dovrei avere meccanismi più complessi per arginare meglio le speculazioni. La patch attualmente più diffusa prevede il ritorno di un valore diverso dal valore vero. Quindi nell’esempio fatto da me con la scrittura di una pw su un indirizzo kernel che ritorna tale indirizzo, ne viene ritornato uno fittizio. In ISA NON posso leggere da cache, in quanto tale contenuto non è esposto in ISA.
+
 ## Locked List.c
 
 Abbiamo due tipi di utilizzo:
