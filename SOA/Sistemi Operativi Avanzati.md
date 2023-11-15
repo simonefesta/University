@@ -197,7 +197,7 @@ Qui è necessario bloccare l’istruzione B e tenere traccia di quando il dato c
 
 Qui è necessario adottare una tecnica nota come **register renaming**, secondo cui al programmatore vengono esposti dei registri logici, e ciascuno di questi registri logici (che sono di fatto dei multi-registri) ingloba un insieme di registri fisici non visibili al livello dell’ISA. Quindi noi non scriviamo MAI sul registro esposto in ISA, ma su delle ‘*copie numerate*’ o alias, cioè registri multivalore. Ci ritroviamo dunque nella seguente situazione:
 
-<img title="" src="file:///home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-14-12-10-07-5.png" alt="" width="471">
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-15-15-11-37-5.png)
 
 Qui i vari registri fisici rappresentano diverse versioni del medesimo registro logico *R*. Nel momento in cui all’interno della pipeline entra un’istruzione che vuole scrivere sul registro logico *R*, si considera il primo registro fisico $R_k$ all’interno del quale viene effettivamente memorizzato il valore 
 (quindi scrivo sempre sul primo tag libero, e leggo dall’ultimo tag in pipeline. Se A scrive in TAG 0, e B scrive in TAG 1, leggo da TAG1). Tipicamente, per la selezione del registro fisico, si segue un approccio round-robin; se però a un certo punto tutti i registri fisici di *R* sono stati sovrascritti e nessuna delle istruzioni che ha eseguito la scrittura è andata in commit, per un’eventuale altra scrittura su *R* bisognerà attendere.
@@ -243,17 +243,18 @@ Assumiamo inoltre che:
 
 - *C* esegua l’operazione $f’(R4)$ e riporti l’output sul registro *R1*. (scrive su UN ALTRO alias di R1). 
 
-Ci ritroviamo dunque nel seguente scenario:
+Ci ritroviamo dunque nel seguente scenario:  
 
-<img title="" src="file:///home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/0c432b137d21bf52bdce819a55f6518cbeea17d6.png" alt="" width="329">
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-15-15-11-13-7.png)
 
 È abbastanza evidente che *B* debba leggere **lo stesso alias** scritto da A, mentre C potrà riportare il valore di output su un **alias differente**. In tal modo è possibile **processare $C$ parallelamente ad $A$** :   
 In fondo, anche se *C* genera il suo output prima di *A*, le dipendenze che legano le tre istruzioni non vengono violate. Infatti, *B* sarà comunque in grado di leggere dall’alias sovrascritto da *A* e, ovviamente, rimarrà comunque possibile mandare in commit *C* solo dopo il completamento di *A* e *B*. Il vantaggio che porta questo approccio è la riduzione del tempo necessario per il completamento di *C*.
 
 #### Esempio 2
 
-Vediamo con un secondo esempio riportato qui di seguito come viene associata una entry del ROB a ciascun alias differente:
-<img src="file:///home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-13-18-54-47-8.png" title="" alt="" width="497">
+Vediamo con un secondo esempio riportato qui di seguito come viene associata una entry del ROB a ciascun alias differente:  
+
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-15-15-11-06-8.png)
 
 E’ importante ricordare che, anche se è possibile eseguire in parallelo, non posso pensare di aumentare all’infinito le prestazioni, perchè ad un certo punto eccedo il numero di istruzioni che posso gestire.  
 Questo porta ad un sistema scarico, ovvero non occupo corsie perchè ci sono caricamenti di elementi dalla memoria, oppure eseguo una predizione/azzardo sbagliata che mi porta a svuotare etc...  
@@ -264,7 +265,7 @@ Introduciamo i **Processori HYPERTHREAD**.
 
 ## Organizzazione architetturale dei processori x86 OOO
 
-<img src="file:///home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-13-19-05-12-9.png" title="" alt="" width="314">
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-15-15-10-36-9.png)
 
 ### Processori hyper-threaded
 
@@ -276,11 +277,11 @@ Come abbiamo osservato all’inizio della trattazione, le architetture moderne s
 
 ---
 
-<img src="file:///home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-13-19-09-04-10.png" title="" alt="" width="219">
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-15-15-10-20-10.png)
 
 In tal modo, è possibile eseguire più **workflow in parallelo su un unico core fisico**, e l’architettura risultante è riportata nella pagina seguente:
 
-<img src="file:///home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-13-19-11-10-11.png" title="" alt="" width="493">
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-15-15-10-15-11.png)
 
 Tale architettura risulta molto vantaggiosa per la maggior parte dei workload, mentre risulta un po’ più avversa nel caso in cui tutti i thread che girano sullo **stesso core sono CPU-bound** ma non memory-bound. Infatti, in quest’ultimo caso è più probabile che si verifichi un conflitto tra i thread in esecuzione nell’utilizzo delle risorse della reservation station. Un processore hyper-threaded viene tipicamente marcato con l’indicazione su quanti <u>*core*</u> (=”motori”) e quanti <u>*hyperthread*</u> (=”thread fisici”) possiede.   
 <u>Esempio:</u>   
@@ -322,7 +323,7 @@ Ma quali sono gli stage in cui un’istruzione può rivelarsi offending? 
 Sappiamo bene che *ciascun processo ha il proprio address space* suddiviso in zone di memoria dedicate all’esecuzione *user mode* e zone di memoria dedicate all’esecuzione *kernel mode*. L’attacco ha come scopo ultimo quello di accedere a un’area di memoria situata nel kernel anche se non si hanno i permessi, magari per andare a leggere delle informazioni sensibili di un utente differente del sistema. Andando nel dettaglio, l’attacco viene eseguito nella maniera spiegata qui di seguito. Anzitutto si definisce un array A nella memoria user space e si svuota la cache tramite l’istruzione `cflush`. Dopodiché, mediante una `mov`, si preleva un **particolare byte** $x$ (*e.g*: address) situato nel kernel e si memorizza il byte in un registro; naturalmente questa `mov` è un’istruzione offending. Si accede alla entry con **spiazzamento** **$x$** rispetto all’indirizzo base dell’array A (e.g. caricandone il contenuto in un registro) in modo da farla salire in cache: tale aggiornamento della cache rappresenta proprio il *side effect* lasciato sullo stato micro-architetturale da parte dell’istruzione successiva a quella offending che, chiaramente, viene eseguita *solo speculativamente*. A tal punto, poiché l’array A si trova in user space, è possibile accedere a tutte le sue entry e, per ogni entry, cronometrarne il tempo necessario per l’accesso: la entry relativa al tempo di accesso minore sarà chiaramente quella di spiazzamento $x$, perché si tratta dell’unica entry il cui contenuto era stato memorizzato in cache. Ed ecco qui: **ora è noto** **lo spiazzamento** **x**, che era proprio il byte di memoria prelevato inizialmente dal kernel space. Ricapitolando, il valore $x$ è stato ottenuto in maniera indiretta misurando i tempi di accesso alle informazioni presenti nell’array A. Di conseguenza, abbiamo a che fare con un **side-channel** (o **covert-channel**) **attack**, ovvero con un attacco che fa uso di un canale laterale per andare a rubare delle informazioni. Io parto da un byte *B* presente nella zona kernel, lo salvo in un registro (non potrei), accedo a `array[B]` che va in cache. Successivamente accedo a tutte le entry di array (in un loop continuo, indipendente da *B*). L’accesso più veloce sarà quello ad `array[B]`, e quindi tra tutti gli accessi effettuati, riesco a capire cosa c’è in `array[B]`, perchè più veloce. Quindi prendendo un byte nella zona kernel, riesco da user a leggere qualcosa a livello kernel.  
 Meltdown può essere esteso anche al caso in cui si vuole scoprire un’intera stringa all’interno del kernel space, che può essere una password, una chiave segreta e così via. Negli esempi
 
-<img src="file:///home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-13-19-51-48-12.png" title="" alt="" width="513">
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-15-15-09-24-12.png)
 
 ![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-13-19-51-53-13.png)
 
@@ -331,7 +332,7 @@ Meltdown può essere esteso anche al caso in cui si vuole scoprire un’intera s
 *X_86* ha 8 registri general purpose, e Program Counter 32 bit.   
 *X_86_64* è backward compatibile, ha 15 registri general purpose a 64 bit e Program Counter a 64 bit.
 
-<img title="" src="file:///home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-14-12-22-53-14.png" alt="" width="604">
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-15-15-08-45-14.png)
 
 - **GPR**: registri general purpose.
 
@@ -421,7 +422,7 @@ Per questo motivo, sono stati introdotti anche i predittori a *due bit* di stato
 <u>**Esempio doppio ciclo**</u>: 
 Nel ciclo interno itero, e la predizione mi dice che salterò. Quando finisco le iterazioni nel ciclo interno, la predizione sbaglia e dice che continuerò nel ciclo. Invece aumento l’iterazione sul ciclo esterno (1 errore). Però poi rientro effettivamente nel ciclo interno, quindi in realtà non devo cambiare predizione anche se ho fatto un errore, perchè stavolta ci rientro davvero dentro. *Solo se sbaglio 2 volte cambio previsione.*
 
-<img title="" src="file:///home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/39a7753e686aa4141dda1e22fd8482f7d95cb087.png" alt="">
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-15-15-07-58-20.png)
 
 Ricordiamo che, in caso di previsione sbagliata, in pipeline vengono caricate istruzioni che alla fine subiranno uno <u>squash,</u> che porterà al <u>refill</u> della cache. Quindi è importante effettuare la predizione con un buon tradeoff affidabilità/supporto hw.
 
@@ -529,7 +530,7 @@ if (x < array1_size)
 Con più thread passo alla versione v2!
 È un attacco che sfrutta i salti multi-target (indiretti) ed è di tipo **cross-context**. Ciò vuol dire che l’attaccante è in grado di inferire (aggiungere) delle informazioni sensibili da un contesto di esecuzione diverso dal suo: supponiamo di avere due thread A, B che girano sul medesimo hyperthread in modalità processor sharing o su due hyperthread relativi allo stesso core. Il thread A può portare avanti delle attività che vanno a cambiare lo stato del branch predictor all’interno del CPU-core. Di conseguenza, B può osservare il nuovo stato del branch predictor all’interno del medesimo CPU-core e, quindi, le attività che lui eseguirà in modo speculativo (in funzione dello stato del branch predictor) vengono *praticamente decise, e poi osservate mediante side effect, dal thread A*. Tale side effect, come al solito, può consistere nel caricamento di un’informazione sensibile all’interno della cache attraverso il suo accesso in memoria. L’efficacia dell’attacco diventa particolarmente evidente quando l’attaccante si basa su un contesto che utilizza una libreria condivisa (shared library) col contesto del thread B. Qui, infatti, le pagine di memoria della shared library vista dal thread B e le pagine di memorie della shared library vista dal thread A mappano esattamente sugli stessi indirizzi fisici. Perciò è ovvio che qualunque side effect la vittima lasci speculativamente su tali locazioni fisiche di memoria sia direttamente visibile all’attaccante.
 
-<img src="file:///home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-14-14-09-23-23.png" title="" alt="" width="518">
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-15-15-07-11-23.png)
 
 Con riferimento alla figura, il **gadget** è un blocco di codice che è definito nell’address space della vittima e viene sfruttato dall’attaccante affinché la vittima lo esegua in modo speculativo a seguito di un errore del branch predictor; in tal modo, nello stato micro-architetturale, la vittima lascia i side effect desiderati dall’attaccante. Nell’esempio mostrato nella figura vengono utilizzati due registri (*R1* e *R2*), di cui *R1* viene utilizzato per calcolare R2 con una particolare funzione, mentre *R2* viene usato per memorizzare l’indirizzo verso cui accedere in memoria. In realtà, sarebbe sufficiente l’utilizzo di un solo registro *R1*.
 
@@ -562,9 +563,8 @@ Vediamo nel dettaglio cosa fa questo blocco di istruzioni:
 - In `retpoline_target` si **elimina** l’indirizzo dell’istruzione successiva alla call e, tramite la return, si salta verso l’indirizzo che si trova in cima allo **stack** (ovvero *target_address*). Facendo lo shift di 8 byte, cancelliamo il punto di ritorno della chiamata *retpoline_target.* Dopo ciò, in cima allo stack abbiamo proprio *target_address.* 
 
 - Essendoci una **call** (non è register dependent, mi manda verso la funzione chiamata), il predittore non deve essere soggetto a training: prevede che, a seguito della return, si salti verso l’istruzione successiva alla call. Per questo motivo, dopo la call devono essere eseguite delle istruzioni innocue, come una jump verso l’istruzione stessa di call. La *return* vede qualcosa nell’ *rsb* che non può essere bypassata. La *ret* esegue speculativamente ciò che gli dice *rsb*. Tuttavia, se la CPU specula, l’RSB la porta ad eseguire *jmp 1b*, intrappolandolo in un loop. Successivamente, la CPU realizza che il valore in RSB è diverso da quello nello stack (*target_address*), e stoppa la speculazione. ***O vado in target_address, o resto in un loop.*** RSB ha senso per singolo processo, mentre il predittore si muove tra più flussi.
-  
 
-<img src="file:///home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-14-14-23-38-24.png" title="" alt="" width="400">
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-15-15-06-33-24.png)
 
 ### IBRS (Indirect Branch  Restricted Speculation)
 
@@ -574,7 +574,6 @@ Vediamo nel dettaglio cosa fa questo blocco di istruzioni:
 
 Anche qui ci si basa sull’utilizzo del MSR. In particolare, nell’istante in cui si va a scrivere all’interno di tale registro, stiamo cancellando tutto ciò che il branch predictor dei salti indiretti ha imparato finora, creando così una sorta di barriera. Al tempo $t$ resettiamo il branch predictor.
 
-  
 **IBRS** e **IBPB** sono operazioni software, spesso si usa la syscall `prcrc()` per lavorare col Processor Control.  Se lavoriamo con `exec()` (programma che chiama un altro programma) funzionano uguale, perchè facenti parte dello stesso programma iniziale.
 
 ## Sanitizzazione
@@ -591,7 +590,7 @@ L’indice è passato dall’user, ma è compatibile con la taglia della tabella
 
 ### Come funziona - for dummies
 
-<img src="file:///home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-14-14-35-38-25.png" title="" alt="" width="368">
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-15-15-05-55-25.png)
 
 Normalmente avremmo “indici OK” (verde) ed “indici NON OK” (rosso). Però se usassi questi indici NON OK, potrei andare in zone delicate. Introduco la “zona nera”, più ampia. Tutto quello che cade li dentro lo butto nella zona rossa, che sarà la più piccola possibile, per limitare i danni.  
 Come lo faccio? Applicando una maschera di bit.  
@@ -608,7 +607,6 @@ Ricordiamo che i salti sono azzardi, sbagliare salto compromette performance (sq
 int s=0;
 for (int i=0; i<16; i++)
     { s+=i;}
-
 ```
 
 Questo ciclo si traduce nella seguente sequenza di istruzioni assembly (dove la sintassi adottata è AT&T):
@@ -622,7 +620,6 @@ Come si può notare, a ogni iterazione del ciclo vengono eseguite cinque istruzi
 #pragma GCC optimize (“unroll-loops”)
 //region to unroll
 #pragma GCC pop_options
-
 ```
 
 È anche possibile specificare esplicitamente il fattore di unroll mediante `#pragma unroll (N)`. Ma affinché queste direttive siano effettivamente attive, è necessario compilare il file C col *flag -O*.
@@ -659,11 +656,10 @@ All’interno di ciascun core possono esserci **più** **hyperthread** **distint
 
 Successivamente si è passati all’**UMA**: memoria unica ad accesso uniforme, cioè stesse componenti hardware accedute in parallelo. Poi **NUMA**.
 
-
 ### Non Uniform Memory Access (NUMA):
 
-Qui la memoria è divisa in banchi, ciascuno dei quali è direttamente collegato a uno specifico core (o a un insieme di core). Se un thread che gira in CPU-corei accede al banco di memoria a esso vicino, l’interazione con la memora risulta molto efficiente, mentre se deve accedere a un altro banco di memoria, impiegherà più tempo. Tale soluzione risulta vantaggiosa nel momento in cui si riesce a fare in modo che ciascun CPU-core acceda prevalentemente al *proprio* banco di memoria (ovvero effettui prevalentemente degli accessi locali). 
-Ciascuna **coppia** (cpu-$core_i$, *banco di memoria $i$*) o (insieme $i$ di CPU-core, banco di memoria $i$) costituisce un **nodo NUMA**. I thread possono leggere da indirizzi diversi (quello che abbiamo detto prima), tuttavia l’interconnect è time shared, si genera traffico, che deve essere ben gestito.   
+Qui la memoria è divisa in banchi, ciascuno dei quali è direttamente collegato a uno specifico core (o a un insieme di core). Se un thread che gira in CPU-core *i*  accede al banco di memoria a esso vicino, l’interazione con la memora risulta molto efficiente, mentre se deve accedere a un altro banco di memoria, impiegherà più tempo. Tale soluzione risulta vantaggiosa nel momento in cui si riesce a fare in modo che ciascun CPU-core acceda prevalentemente al *proprio* banco di memoria (ovvero effettui prevalentemente degli accessi locali). 
+Ciascuna **coppia** (CPU-core *i*, *banco di memoria $i$*) o (insieme $i$ di CPU-core, banco di memoria $i$) costituisce un **nodo NUMA**. I thread possono leggere da indirizzi diversi (quello che abbiamo detto prima), tuttavia l’interconnect è time shared, si genera traffico, che deve essere ben gestito.   
 **Osservazione**:
 
 - Un accesso locale (CPU verso memoria adiacente) richiede un tempo pari a *50(hit)+200(miss)* cicli, quindi è anche facile capire, osservando il tempo, se si ha hit o miss.  
@@ -692,4 +688,110 @@ Le due principali tecniche utilizzate per mantenere la consistenza, ricordando c
 
 ## Protocolli CC Cache Coherency
 
-- pag 33 fanfa
+Permettono di conseguire la cache coherency e sono il risultato delle scelte di: 
+
+- Un insieme di transazioni (e.g. aggiornamento di una replica della cache) supportate dal cache system distribuito. 
+
+- Un insieme di stati per i cache block (= unità minime della memoria che possono essere portate all’interno della cache). 
+
+- Un insieme di eventi che capitano all’interno del cache system distribuito. 
+
+- Un insieme di transizioni di stato.
+
+Il design dei protocolli CC dipende da svariati fattori come: 
+
+- La topologia dei componenti (e.g. single bus, gerarchica, ring-based). 
+
+- Le primitive di comunicazione (i.e. unicast, multicast, broadcast). 
+
+- Le cache policy (e.g. write-back, write-through). 
+
+- Le feature della gerarchia di memoria (e.g. numero di livelli della cache, inclusiveness).
+
+Implementazioni di cache coherency differenti possono presentare prestazioni diverse in termini di:
+
+- **Latenza**: tempo per completare una singola transazione. 
+
+- **Throughput**: numero di transazioni completate per unità di tempo; aumenta se si fa in modo che scritture su aree di memoria diverse (e sufficientemente distanti) da parte di thread differenti avvengano in modo concorrente. 
+
+- **Overhead spaziale:** numero di bit richiesti per mantenere lo stato di un cache block.
+
+Esistono due famiglie principali di protocolli CC: 
+
+- **Invalidate** **protocols**: quando un CPU-core scrive su una copia di un blocco, qualsiasi altra copia del medesimo blocco (i.e. della medesima informazione) viene *invalidata*: soltanto chi ha scritto l’ultima informazione ha la versione aggiornata del blocco. In tal caso, si utilizza poca banda ma si ha una latenza elevata per gli accessi in lettura: infatti, un CPU-core che si trova vicino a una replica invalidata, per andare a leggere il dato, ha la necessità di sfruttare l’unica replica valida, che è lontana. Sostanzialmente se aggiorno una linea di cache, spariscono tutte le altre repliche. Leggeranno tutti da me, perchè ho l’unica copia valida. 
+
+- **Update** **protocols**: quando un CPU-core scrive su una copia di un blocco, la nuova informazione viene propagata su tutte le altre copie del medesimo blocco. In tal caso, si ha una bassa latenza per gli accessi in lettura ma utilizza molta più banda.
+
+Per poter invalidare / modificare una replica di un blocco che è stato aggiornato, si ricorre al cosiddetto **Snooping** **cache**: le componenti della cache e della memoria sono agganciati a un **broadcast medium** (= interconnection network, è un canale di comunicazione broadcast) tramite un controller, che ha la responsabilità di osservare le transizioni di stato degli altri componenti e di far reagire il componente locale di conseguenza (appunto invalidando o modificando la replica locale del blocco aggiornato). Naturalmente, il controller utilizza il broadcast medium anche per trasmettere gli aggiornamenti che avvengono in un blocco di cache locale. Mediante il broadcast medium siamo in grado di serializzare le transizioni di stato. *Inoltre, una transizione di stato non può occorrere* *finché il broadcast medium non viene acquisito in uso dal controller.*
+
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-15-14-21-52-32.png)
+
+<img src="file:///home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/daf1efd4c98d63bd605beea9d305df733100ceaf.png" title="" alt="33.png" width="301">
+
+Nel mondo reale viene adottato lo *Snooping cache* accoppiato con un protocollo basato sull’invalidazione. Vediamo dunque nel dettaglio alcuni di questi protocolli basati sull’invalidazione. Ad esempio, una componente di cache $L_1$ ha una replica *r*, vuole eseguire operazione su tale replica mediante il richiamo di broadcast medium, in cui annuncio alle altre componenti che, chi ha una copia della replica *r*, deve  aggiornare. Nel mentre, nessuno può eseguire altri aggiornamenti se ho io il broadcast medium. Ciò crea un problema di scalabilità, se lavoro con tanti dati e repliche.
+
+**Osservazione**: devo per forza aggiornare le repliche? E se non mi servissero? Ad esempio, un thread su $CPU_0$ con cache $L_1$ vi esegue un aggiornamento su linea di memoria e comunica in maniera distribuita di cancellare quella linea di cache. Ma se quella linea di cache fosse già invalida per altri?  
+Si mantiene traccia di queste operazioni mediante:
+
+### Protocollo MSI (Modified-Shared-Invalid)
+
+È un protocollo in cui qualsiasi transazione di scrittura su una **copia di un cache** **block** invalida tutte le altre copie del cache block. Quando dobbiamo servire delle transazioni di lettura: 
+
+- Se la policy della cache è **write-through**, recuperiamo semplicemente l’ultima copia aggiornata dalla memoria.
+
+- Se la policy della cache è **write-back**, recuperiamo l’ultima copia aggiornata o dalla memoria o da un altro componente di caching.
+
+In questo protocollo è necessario tenere traccia dello stato della copia di un blocco: 
+
+- Si trova nello stato *modified* se è appena stata sovrascritta. 
+
+- Si trova nello stato *shared* se esistono dei CPU-core che stanno leggendo altre copie del medesimo blocco (per cui esistono più copie valide di tale blocco).
+
+- Si trova nello stato *invalid* se un’altra copia del medesimo blocco è appena stata sovrascritta.
+
+Il **problema** di MSI risiede nel fatto che richiede l’invio di un messaggio di invalidazione in broadcast (tramite il broadcast medium) ogni volta che una copia di un blocco viene modificata (e questo anche in caso di scritture successive sulla medesima copia). Questo può portare a impegnare massivamente il broadcast medium anche quando non ce n’è bisogno, perché magari tutte le altre copie erano nello stato invalid già da prima. Per ovviare a tale inconveniente, si ricorre ai protocolli descritti successivamente.
+
+### Protocollo MESI (Modified-Exclusive-Shared-Invalid):
+
+Rispetto a MSI, prevede uno stato in più, che è **exclusive**. 
+In pratica, un CPU-core *i* che vuole apportare delle modifiche alla propria copia di un blocco deve richiedere l’**ownership** (l’esclusività) di quel blocco; questa è l’unica occasione in cui CPU-core *i* utilizza il broadcast medium per comunicare agli altri nodi che devono invalidare la propria copia del blocco. Una volta che la copia è nello stato *exclusive*, CPU-core *i* può modificarla tutte le volte che vuole senza dover comunicare più nulla a nessuno, finché un altro CPU-core non richiede di effettuare una lettura da un’altra copia dello stesso cache block (momento in cui la copia) passa allo stato shared). L’automa raffigurato di seguito descrive in modo completo il funzionamento del protocollo MESI. Schematizzando:
+
+- **Modified**: Ho modificato un dato shared.
+
+- **Exclusive**: Sono il solo proprietario del dato, posso modificarlo liberamente, senza bus message.
+
+- **Shared**:  Ho una copia del dato che un altro processo possiede.
+
+- **Invalid**: La mia copia del dato non è aggiornata.
+
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-15-14-36-45-34.png)
+
+Ogni volta che si esce dallo stato modified, si effettua il *write back* in memoria delle nuove informazioni che sono state scritte. Se volessi solamente leggere? Chi ha l’informazione si trova in *exclusive* e poi passa a *shared*. Potrei introdurre un quinto stato per evitare queste due transizioni. La linea exclusive è a mio uso esclusivo. Solo lo stato Invalid crea interazioni distribuite. Lo stato Modified è importante per cache write back, ma non devo informare tutti.
+
+### **Protocollo MOESI (Modified-Owned-Exclusive-Shared-Invalid):**
+
+Rispetto a MESI, prevede un ulteriore stato in più, che è **owned**. In particolare, una copia di un cache block passa dallo stato modified allo stato *owned* (anziché shared) nel momento in cui stava per essere sovrascritta ma un’altra copia dello stesso blocco viene letta. *Owned* significa che la copia è tuttora in fase di aggiornamento ma, nel frattempo, altre copie dello stesso blocco vengono lette: se devono occorrere nuovi aggiornamenti quando si è nello stato *owned*, non ci si deve preoccupare di chiedere nuovamente l’esclusività del blocco, bensì si passa direttamente allo stato modified, invalidando tutte le altre copie. Di seguito è rappresentato l’automa completo del protocollo MOESI.
+
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-15-15-36-55-35.png)
+
+Nello stato **Owned** io ho l’uso esclusivo di un dato. Se mi chiedono di condividerlo, gli altri **non** possono scriverci. Tale stato ci permette di transitare tra più stati, in quanto non devo riacquisire l’esclusività.
+
+**Protocolli directory based:** 
+In realtà, i protocolli basati su snooping cache non scalano poiché le transazioni portano a una comunicazione broadcast. Per questo motivo sono stati introdotti i protocolli directory based, in cui i vari aggiornamenti possono essere point-to-point tra i vari CPU-core / processori. In particolare, supponiamo di avere un sistema con N processori $P_0$, $P_1$,…, $P_{N-1}$. Per ciascun blocco di memoria si mantiene una directory entry, composta da: 
+
+- N bit di presenza (l’i-esimo bit è impostato a 1 se il blocco si trova nella cache di $P_i$). 
+
+- 1 dirty bit, che indica se il blocco è stato **modificato** senza che gli aggiornamenti siano stati riportati in memoria.
+
+Se dirty bit = 0 e ho più possessori, linea cache condivisa.   
+Dirty bit = 1 se qualcuno lo scrive, però per passare a condiviso deve ritornare a 0. E’ una machera che mi dice chi può fare cosa.
+
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-15-15-29-05-37.png)
+
+- **Caso 1**: $P_0$ vuole leggere il blocco X, ha un cache miss e il dirty bit è pari a 0. X viene letto dalla memoria, il bit `presence[0]` viene settato a 1 e i dati vengono consegnati al lettore.
+
+- **Caso 2**: $P_0$ vuole leggere il blocco X, ha un cache miss e il dirty bit è pari a 1. X viene richiamato dal processore $P_j$ tale che `presence[j]=1`. Dopodiché il dirty bit viene settato a 0, il blocco viene condiviso e il bit `presence[0]` viene settato a 1. Infine, i dati vengono consegnati al lettore e propagati in memoria.
+
+- **Caso** **3**: $P_0$ vuole scrivere sul blocco X, ha un cache miss e il dirty bit è pari a 0. $P_0$ invia un messaggio di invalidazione non a tutti gli altri processori, bensì solo a quelli col bit `presence[j]` pari a 1. Dopodiché tali `presence[j]` vengono settati a 0, e `presence[0]` e il dirty bit vengono impostati a 1.
+
+- **Caso** **4**: $P_0$ vuole scrivere sul blocco X, ha un cache miss e il dirty bit è pari a 1. X viene richiamato dal processore $P_j$ tale che `presence[j]=1`. Dopodiché `presence[j]` viene settato a 0 e `presence[0]` viene impostato a 1.
