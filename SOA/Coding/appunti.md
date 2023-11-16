@@ -344,3 +344,65 @@ Noi abbiamo usato i moduli come strumento. Il thread kernel potrebbe andare in b
 Nel codice della funzione, c'è funzione di smontaggio `kmem_cache_destroy`, ma ciò porta ad un leak di memoria, inoltre rimuovo allocatore, ma non so se è stato correttamente rimosso.
 
 Page table sfruttabili per arrivare direttamente in memoria. Se parametro è oltre addr_limit, sfrutto questo espediente.
+
+# 16 novembre
+
+## usctm.c
+
+Nel file abbiamo `sys_call_table_address` e un `module_param`, lo stesso per `ni_sys_call_address`, e sempre con i parametri li rendiamo visibili grazie al virtual file system (flag 0660).
+`free_entries[MAX_FREE]` è parametro del modulo, posso osservare tale oggetto mediante `module_param_array(free_entries,NULL,0660)`.
+Rechiamoci in `cd /sys/module/the_utsmc/parameters` e vediamo gli elementi appena descritti.
+
+Con `sudo cat free_entries` vediamo le entries non null marcate dal file.
+
+## l1tf - Kernel Level memory management
+
+Nella cartella c'è codice `doit.c`, passo indirizzo fisico, a cui page table monta. Viene fatto tramite modulo.
+Il modulo è `devmem_allow.c`, che sfrutta `kallsyms_lookup_name`. I kernel devono lavorare in specifiche zone. Ok con kernel < 5.7.
+
+Troviamo `devmem_is_allowed` e `text_poke`, che mi permette di applicare patch che voglio io! (diverso da kernel probe)
+Sostituisco a `devmem_is_allowed` istruzioni dummy per bypassarlo (slla fine sono delle push).
+
+### Moduli
+
+Abbiamo :
+
+#### **printk_example**:
+
+ se andiamo a vedere il makefile, esso mi da alcuni commands, tra cui `mount`, in cui usiamo anche `the_syscall_table=${A}`, cioè passato da `sys_call_table_address`.
+
+#### **kprob_usage_example:**
+
+ Abbiamo unsigned long = 0, possiamo osservare il valore di tale variabile. `hook_func=0` e `audit_counter=0`, il secondo conta le volte che succede "qualcosa" nel software. Se passiamo da threadA a threadB, prendiamo questo. Contiamo context switch.
+Il codice associato ad `hook` intercetta accesso a funzione target, e stiamo chiamando la finalizzazione. Il contatore interno è atomico, mentre "message_counter" non lo è.
+In `__init hook_init` installiamo kretprobe. Poi abbiamo anche unregistre del module.  
+La interception del context switch ci permette di dire che, se dei thread devono essere gestiti in modo diverso, possiamo innalzare delle barriere se sospetti.
+
+### Kprobe-read-interceptor
+
+Supponiamo che thead chiama read. Se è su stdout (canale 0), la intercetto per uno specifico processo. A livello kernel intercetto anche password scritte su stdin. Quando entro in sys_read non ho snapshot cpu, quindi non so nè canale nè puntatore. Li so all'uscita, ed avrei altre cose nei registri.
+Devo installare handler h' di ingresso, mi devo registrare i parametri utili da qualche utili, e prenderli quando mi servono per fare le operazioni. Dove li metto? entro in sottosistema, potrei chiamare allocatore memoria in modo atomic, come relaziono tale memoria al thread? serve pointer. E dove lo prendo? Nell'handler ho solo variabili locali, dopo il pre_handler è perso.
+
+Soluzione: Utilizziamo estensione logica del thread control block, quindi con più informazioni. Dove la prendiamo questa memoria per estendere?
+Semplicissimo: Il TCB ha pointer a stack area del thread. In alcune versioni, la parte top dello stack ha un'estensione del TCB. Possiamo scriverci "sotto"?
+Basta non saturare la stack area.
+Quindi, l'handler registra in questa area l'info del dove verranno salvati.
+H' li riprenderà in quell'area di memoria. Tutto mediante pointer area user, settato quando entrato, e usiamo quando usciamo.
+
+In `hook.c` vediamo che i metadati sono in struct `thread_info`, e mi spiazzo a seconda se il kernel includa quest'area iniziale allo stack.
+Prendo `current` , è pointer a TCB, come punto allo stack? `->stack` e poi mi spiazzo di offset. 
+Quando lo riusco, uso `load_address`. Vengono usati dagli handler.
+
+All'inizio `target_pid=-1`, non osservo alcun processo.
+
+A seconda della versione kernel, manteniamo snapshot da una parte piuttosto che un'altra.
+
+Ritornare "1" su pre-handler, vuol dire che l'handler di *uscita* NON viene eseguito. Se devo monitorare, prendo `regs->si`, e faccio store in quest'area.
+
+Allora ritorna 0, e l'handler di uscita eseguirà. In questo secondo handler, alcuni check già li ho fatti prima, devo sapere quanti dati sono stati consegnati, lo vedo dal valore di ritorno di sys_read. Poi li loggo con `printk`.
+
+Questo viene fatto da un thread associato ad uno specifico processo.
+
+Il blocco `while(!copy_from_user((void...)` è bloccante, può generare dei fault. Non potrei eseguirla, allora installo altro modulo. Sostanzialmente, se la cpu va ad altri, viene installato il contesto dell'altro e viene eseguito. Quando ritorno io, mi viene restorato il mio contesto, preso dalla variabile `per-cpu`.
+
+Nel modulo dichiaro variabile `per-cpu` per la discovery, per spostarmi nell'area in cui c'è oggetto il cui valore è pari a `kp`, cioè variabile di cui devo fare l'aggiustamento. C'è codice `brute force`, si può fare solo quando installiamo il modulo, una volta solo. Devo fare eseguire tale funzione su tutte le cpu.
