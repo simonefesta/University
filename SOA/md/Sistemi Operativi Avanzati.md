@@ -566,7 +566,7 @@ Vediamo nel dettaglio cosa fa questo blocco di istruzioni:
 
 ![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-15-15-06-33-24.png)
 
-### IBRS (Indirect Branch  Restricted Speculation)
+### IBRS (Indirect Branch Restricted Speculation)
 
 È possibile aggiornare il registro **MSR** (Model Specific Register, è un registro di controllo nella CPU) per creare un’enclave di esecuzione (= uno spazio di esecuzione chiuso entro determinati confini) dove la storia non è influenzata da cosa avviene al di fuori dell’enclave stessa. In pratica, a livello hardware siamo in grado di utilizzare la branch prediction in maniera differenziata a seconda se stiamo lavorando a livello user (MSR=0) o a livello kernel (MSR=1): nel primo caso il branch predictor dei salti indiretti si basa sulla storia passata della sola esecuzione a livello user, mentre nel secondo caso si basa sulla storia passata della sola esecuzione a livello kernel. Sostanzialmente, a tempo $t$ decido che lo stato del predittore non dovrà più essere usato per un certo tempo. E’ un guscio che mi protegge dall’esterno. Utile se ho app che lavorano a livelli diversi (user e kernel), se ad esempio volessi che le scelte kernel non venissero influenzate dall’user.
 
@@ -658,7 +658,7 @@ Successivamente si è passati all’**UMA**: memoria unica ad accesso uniforme, 
 
 ### Non Uniform Memory Access (NUMA):
 
-Qui la memoria è divisa in banchi, ciascuno dei quali è direttamente collegato a uno specifico core (o a un insieme di core). Se un thread che gira in CPU-core *i*  accede al banco di memoria a esso vicino, l’interazione con la memora risulta molto efficiente, mentre se deve accedere a un altro banco di memoria, impiegherà più tempo. Tale soluzione risulta vantaggiosa nel momento in cui si riesce a fare in modo che ciascun CPU-core acceda prevalentemente al *proprio* banco di memoria (ovvero effettui prevalentemente degli accessi locali). 
+Qui la memoria è divisa in banchi, ciascuno dei quali è direttamente collegato a uno specifico core (o a un insieme di core). Se un thread che gira in CPU-core *i*  accede al banco di memoria a esso vicino, l’interazione con la memoria risulta molto efficiente, mentre se deve accedere a un altro banco di memoria, impiegherà più tempo. Tale soluzione risulta vantaggiosa nel momento in cui si riesce a fare in modo che ciascun CPU-core acceda prevalentemente al *proprio* banco di memoria (ovvero effettui prevalentemente degli accessi locali). 
 Ciascuna **coppia** (CPU-core *i*, *banco di memoria $i$*) o (insieme $i$ di CPU-core, banco di memoria $i$) costituisce un **nodo NUMA**. I thread possono leggere da indirizzi diversi (quello che abbiamo detto prima), tuttavia l’interconnect è time shared, si genera traffico, che deve essere ben gestito.   
 **Osservazione**:
 
@@ -735,17 +735,17 @@ Si mantiene traccia di queste operazioni mediante:
 
 ### Protocollo MSI (Modified-Shared-Invalid)
 
-È un protocollo in cui qualsiasi transazione di scrittura su una **copia di un cache** **block** invalida tutte le altre copie del cache block. Quando dobbiamo servire delle transazioni di lettura: 
+È un protocollo in cui qualsiasi transazione di scrittura su una **copia di un cache** **block** invalida tutte le altre copie del cache block. Quando dobbiamo servire delle transazioni di **lettura**: 
 
-- Se la policy della cache è **write-through**, recuperiamo semplicemente l’ultima copia aggiornata dalla memoria.
+- Se la policy della cache è **write-through**, recuperiamo semplicemente l’ultima copia aggiornata dalla *memoria*.
 
-- Se la policy della cache è **write-back**, recuperiamo l’ultima copia aggiornata o dalla memoria o da un altro componente di caching.
+- Se la policy della cache è **write-back**, recuperiamo l’ultima copia aggiornata o dalla memoria o da un altro componente di *caching*.
 
 In questo protocollo è necessario tenere traccia dello stato della copia di un blocco: 
 
 - Si trova nello stato *modified* se è appena stata sovrascritta. 
 
-- Si trova nello stato *shared* se esistono dei CPU-core che stanno leggendo altre copie del medesimo blocco (per cui esistono più copie valide di tale blocco).
+- Si trova nello stato *shared* se esistono dei CPU-core che stanno leggendo altre copie del medesimo blocco (per cui esistono più copie *valide* di tale blocco).
 
 - Si trova nello stato *invalid* se un’altra copia del medesimo blocco è appena stata sovrascritta.
 
@@ -754,11 +754,11 @@ Il **problema** di MSI risiede nel fatto che richiede l’invio di un messaggio 
 ### Protocollo MESI (Modified-Exclusive-Shared-Invalid):
 
 Rispetto a MSI, prevede uno stato in più, che è **exclusive**. 
-In pratica, un CPU-core *i* che vuole apportare delle modifiche alla propria copia di un blocco deve richiedere l’**ownership** (l’esclusività) di quel blocco; questa è l’unica occasione in cui CPU-core *i* utilizza il broadcast medium per comunicare agli altri nodi che devono invalidare la propria copia del blocco. Una volta che la copia è nello stato *exclusive*, CPU-core *i* può modificarla tutte le volte che vuole senza dover comunicare più nulla a nessuno, finché un altro CPU-core non richiede di effettuare una lettura da un’altra copia dello stesso cache block (momento in cui la copia) passa allo stato shared). L’automa raffigurato di seguito descrive in modo completo il funzionamento del protocollo MESI. Schematizzando:
+In pratica, un CPU-core *i* che vuole apportare delle modifiche alla propria copia di un blocco deve richiedere l’**ownership** (*l’esclusività*) di quel blocco; questa è l’unica occasione in cui CPU-core *i* utilizza il broadcast medium per comunicare agli altri nodi che devono *invalidare* la propria copia del blocco. Una volta che la copia è nello stato *exclusive*, CPU-core *i* può modificarla tutte le volte che vuole *senza dover comunicare più nulla* a nessuno, finché un altro CPU-core non richiede di effettuare una lettura da un’altra copia dello stesso cache block (momento in cui la copia passa allo stato *shared*). L’automa raffigurato di seguito descrive in modo completo il funzionamento del protocollo MESI. Schematizzando:
 
 - **Modified**: Ho modificato un dato shared.
 
-- **Exclusive**: Sono il solo proprietario del dato, posso modificarlo liberamente, senza bus message.
+- **Exclusive**: Sono il solo proprietario del dato, posso modificarlo liberamente, senza bus message (passando a Modified).
 
 - **Shared**:  Ho una copia del dato che un altro processo possiede.
 
@@ -768,7 +768,7 @@ In pratica, un CPU-core *i* che vuole apportare delle modifiche alla propria cop
 
 Ogni volta che si esce dallo stato modified, si effettua il *write back* in memoria delle nuove informazioni che sono state scritte. Se volessi solamente leggere? Chi ha l’informazione si trova in *exclusive* e poi passa a *shared*. Potrei introdurre un quinto stato per evitare queste due transizioni. La linea exclusive è a mio uso esclusivo. Solo lo stato Invalid crea interazioni distribuite. Lo stato Modified è importante per cache write back, ma non devo informare tutti.
 
-### **Protocollo MOESI (Modified-Owned-Exclusive-Shared-Invalid):**
+### Protocollo MOESI (Modified-Owned-Exclusive-Shared-Invalid):
 
 Rispetto a MESI, prevede un ulteriore stato in più, che è **owned**. In particolare, una copia di un cache block passa dallo stato modified allo stato *owned* (anziché shared) nel momento in cui stava per essere sovrascritta ma un’altra copia dello stesso blocco viene letta. *Owned* significa che la copia è tuttora in fase di aggiornamento ma, nel frattempo, altre copie dello stesso blocco vengono lette: se devono occorrere nuovi aggiornamenti quando si è nello stato *owned*, non ci si deve preoccupare di chiedere nuovamente l’esclusività del blocco, bensì si passa direttamente allo stato modified, invalidando tutte le altre copie. Di seguito è rappresentato l’automa completo del protocollo MOESI.
 
@@ -776,7 +776,8 @@ Rispetto a MESI, prevede un ulteriore stato in più, che è **owned**. In partic
 
 Nello stato **Owned** io ho l’uso esclusivo di un dato. Se mi chiedono di condividerlo, gli altri **non** possono scriverci. Tale stato ci permette di transitare tra più stati, in quanto non devo riacquisire l’esclusività.
 
-**Protocolli directory based:** 
+### Protocolli directory based:
+
 In realtà, i protocolli basati su snooping cache non scalano poiché le transazioni portano a una comunicazione broadcast. Per questo motivo sono stati introdotti i protocolli directory based, in cui i vari aggiornamenti possono essere point-to-point tra i vari CPU-core / processori. In particolare, supponiamo di avere un sistema con N processori $P_0$, $P_1$,…, $P_{N-1}$. Per ciascun blocco di memoria si mantiene una directory entry, composta da: 
 
 - N bit di presenza (l’i-esimo bit è impostato a 1 se il blocco si trova nella cache di $P_i$). 
@@ -788,10 +789,311 @@ Dirty bit = 1 se qualcuno lo scrive, però per passare a condiviso deve ritornar
 
 ![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-15-15-29-05-37.png)
 
-- **Caso 1**: $P_0$ vuole leggere il blocco X, ha un cache miss e il dirty bit è pari a 0. X viene letto dalla memoria, il bit `presence[0]` viene settato a 1 e i dati vengono consegnati al lettore.
+- **Caso 1**: $P_0$ vuole *leggere* il blocco X, ha un cache miss e il dirty bit è pari a 0. X viene letto dalla memoria, il bit `presence[0]` viene settato a 1 e i dati vengono consegnati al lettore.
 
-- **Caso 2**: $P_0$ vuole leggere il blocco X, ha un cache miss e il dirty bit è pari a 1. X viene richiamato dal processore $P_j$ tale che `presence[j]=1`. Dopodiché il dirty bit viene settato a 0, il blocco viene condiviso e il bit `presence[0]` viene settato a 1. Infine, i dati vengono consegnati al lettore e propagati in memoria.
+- **Caso 2**: $P_0$ vuole *leggere* il blocco X, ha un cache miss e il dirty bit è pari a 1. X viene richiamato dal processore $P_j$ tale che `presence[j]=1`. Dopodiché il dirty bit viene settato a 0, il blocco viene condiviso e il bit `presence[0]` viene settato a 1. Infine, i dati vengono consegnati al lettore e propagati in memoria.
 
-- **Caso** **3**: $P_0$ vuole scrivere sul blocco X, ha un cache miss e il dirty bit è pari a 0. $P_0$ invia un messaggio di invalidazione non a tutti gli altri processori, bensì solo a quelli col bit `presence[j]` pari a 1. Dopodiché tali `presence[j]` vengono settati a 0, e `presence[0]` e il dirty bit vengono impostati a 1.
+- **Caso** **3**: $P_0$ vuole *scrivere* sul blocco X, ha un cache miss e il dirty bit è pari a 0. $P_0$ invia un messaggio di invalidazione non a tutti gli altri processori, bensì solo a quelli col bit `presence[j]` pari a 1. Dopodiché tali `presence[j]` vengono settati a 0, e `presence[0]` e il dirty bit vengono impostati a 1.
 
-- **Caso** **4**: $P_0$ vuole scrivere sul blocco X, ha un cache miss e il dirty bit è pari a 1. X viene richiamato dal processore $P_j$ tale che `presence[j]=1`. Dopodiché `presence[j]` viene settato a 0 e `presence[0]` viene impostato a 1.
+- **Caso** **4**: $P_0$ vuole *scrivere* sul blocco X, ha un cache miss e il dirty bit è pari a 1. X viene richiamato dal processore $P_j$ tale che `presence[j]=1`. Dopodiché `presence[j]` viene settato a 0 e `presence[0]` viene impostato a 1.
+
+## Implementazioni x86
+
+**Intel:** 
+
+- Principalmente **MESI**. 
+
+- **Cache inclusive** (tutte le informazioni che si trovano in un particolare livello della memoria sono riportate anche in tutti i livelli *inferiori* della memoria).
+
+- **Write back** (gli aggiornamenti effettuati su un blocco di cache B verranno riportati in memoria solo quando B dovrà essere rimosso dalla cache - “evicted”). 
+
+- Cache L1 composta da **linee** (blocchi) **di 64 byte**.
+
+**AMD:** 
+
+- Principalmente **MOESI**. 
+
+- **Cache non inclusive** (o esclusive), in particolare al livello L3 (non è detto che la cache L3 contenga tutti i blocchi presenti in cache L1 e in cache L2, magari dato sale in L1 ma non è detto che sia in L3); qui la cache L3 è utile per ospitare i blocchi che devono essere rimossi dai livelli superiori della cache. Sicuramente avere cache non inclusive rende il sistema meno vulnerabile ad attacchi di tipo side-channel che si basano sull’utilizzo della cache. 
+
+- **Write back**. 
+
+- Cache L1 composta da **linee** (blocchi) **di 64 byte**.
+
+## False cache sharing
+
+Supponiamo di avere un thread A che deve eseguire delle operazioni di scrittura su un dato $X$, e supponiamo di avere un thread B che deve eseguire delle operazioni di scrittura su un dato $Y$, dove $X$ e $Y$ sono *independenti* tra loro. Idealmente, i due thread devono poter effettuare le loro scritture in modo concorrente. Se però $X$ e $Y$ si trovano sulla **stessa linea di cache**, abbiamo che A, per scrivere su $X$, deve richiedere in uso esclusivo tutti i 64 byte che costituiscono il blocco e, quindi, anche $Y$; d’altra parte, B, per scrivere su $Y$, deve richiedere in uso esclusivo l’intero blocco e, quindi, anche $X$. Questo scenario, noto come **false cache sharing**, porta all’inondazione di transazioni distribuite dovuta a un ping-pong tra A e B di *Request For Ownership* per la medesima linea di cache: da qui consegue un crollo delle performance. Tale effetto deleterio lo avremmo avuto anche nel caso in cui A avesse dovuto eseguire delle operazioni di scrittura su $X$ mentre B debba eseguire delle operazioni di lettura su $Y$.
+
+Comunque sia, dobbiamo essere attenti anche allo scenario duale: se il thread A deve eseguire delle operazioni correlate tra loro sia sul dato $X$ che sul dato $Y$, stavolta è opportuno avere $X$ e $Y$ sulla stessa linea di cache: in tal modo, diminuiamo la probabilità di ritrovarci dei dati scorrelati all’interno del blocco in cui si trovano $X$ e $Y$.
+
+
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-19-16-34-16-38.png)
+
+Se `ALIGNMENT = 64`, sto allineando esattamente a una linea di cache. Parto sicuramente da li, poi in base alla size potrei eccedere.
+
+## Attacco Flush + Reload
+
+È l’antenato degli attacchi Meltdown e Spectre visti precedentemente ed è stato documentato per la prima volta nel 2013. In quest’attacco si hanno due thread:  A (la vittima) e B (l’attaccante); che hanno la possibilità di accedere alle medesime informazioni in memoria. B può eseguire il **flush** della cache per poi eseguire degli accessi cronometrati in memoria (**reload**): se per leggere un dato impiega poco tempo, vuol dire che, nel frattempo, quello stesso dato è stato **ricaricato** in cache da parte di A (e quindi viene usato da A). Questo meccanismo può essere applicato anche sulle istruzioni macchina: anch’esse, quando vengono accedute per essere eseguite, vengono caricate in cache. Ciò vuol dire che B può essere in grado di capire anche quali sono le attività che A sta svolgendo. **Nell’ISA, l’unica operazione esposta per la cache è il FLUSH. Non posso fare altro!**
+
+L’implementazione di Flush+Reload su x86 è basata su due building block: 
+
+- Un timer ad alta risoluzione. (**RDTSC**, *32* *bit edx, 32 bit eax* (tot 64)per ogni processore).  
+
+- Un’istruzione non privilegiata che effettui il flush della cache. (quindi togliere contenuto cache con cflush, dando l’indirizzo della memoria).
+
+ Le immagini riportate di seguito mostrano i dettagli di queste due istruzioni.
+
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-19-16-36-17-39.png)
+
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-19-16-36-49-40.png)
+
+- L’istruzione `clflush` accetta come unico parametro una locazione di memoria, che identifica il blocco di memoria da rimuovere dalla cache. 
+
+- È bene utilizzare `clflush` subito dopo l’invocazione all’istruzione `mfence` (che approfondiremo più avanti): per ora basti pensare che `mfence` fa da **barriera** tra tutte le istruzioni che la precedono e tutte le istruzioni che la seguono. In tal modo, siamo sicuri che `clflush` mandi in write back e *rimuova davvero le informazioni che erano state portate in cache*. **Infatti, anche se committo l’istruzione, il dato non va in cache, ma nello store buffer. “Forzo” con** ***mfence*** **ASM, che porta il dato dallo store buffer in cache**. In caso contrario, anche se siamo sicuri che `clfush` venga committata dopo l’istruzione i di accesso alla memoria, `clflush` potrebbe intervenire prima che la memoria cambi realmente stato per effetto dell’istruzione $i$. (Quindi svuotiamo una cache già vuota, perchè dentro non è stato ancora messo nulla!)  
+  Questo è un problema di **memory** **consistency**, che analizzeremo successivamente.
+
+## ASM inline
+
+È un modo per utilizzare la tecnologia assembly all’interno di un programma scritto in C. È molto utile se si vogliono incapsulare alcune istruzioni machine-dependent all’interno del programma. La sintassi è la seguente:
+
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-19-16-39-23-41.png)
+
+- **AssemblerTemplate** = blocco di istruzioni assembly che si vuole inserire all’interno del flusso di esecuzione di una funzione C. Scritto in ISA, lavoro con memoria e registri, quindi niente comandi C, come *int c*.
+
+- **OutputOperands** = blocco dell’ASM inline in cui è possibile specificare in quali variabili devono essere caricati i valori di determinati registri <u>dopo</u> l’esecuzione dell’AssemblerTemplate (post-movimento dati).
+
+- **InputOperands** = blocco dell’ASM inline in cui è possibile specificare in quali registri devono essere caricati i valori di determinate variabili <u>prima</u> dell’esecuzione dell’AssemblerTemplate (pre-movimento dati). Entrambi servono per collegare il codice C all’assembly. 
+
+- **Clobbers** = registri di CPU che si vogliono memorizzare sullo stack prima dell’esecuzione dell’AssemblerTemplate e che si vogliono **ripristinare** dopo l’esecuzione dell’AssemblerTemplate. Mi basta specificare quali, senza preoccuparmi di altro. 
+
+- **GotoLabels** = istruzioni di jump presenti all’interno dell’AssemblerTemplate e che hanno come destinazione altri punti del programma (fuori dall’AssemblerTemplate). Questo blocco dell’ASM va specificato sempre assieme al prefisso `goto` (che viene posto subito prima delle parentesi tonde). Sarebbero i costrutti del tipo `fun_x: ...` Che troviamo in assembly.
+
+- **Volatile** = prefisso opzionale che indica che il compilatore non dovrà attuare alcuna *ottimizzazione* sul codice assembly specificato nell’AssemblerTemplate (quindi non deve esserci il re-ordering delle istruzioni e così via).
+
+### Direttive di compilazione C per gli operandi
+
+Il simbolo `=` all’interno dell’ASM inline significa che l’operando deve essere utilizzato come output. Se invece un operando non è associato al simbolo `=`, allora verrà utilizzato come input.
+
+### Possibili operandi per l’ASM
+
+- **r**  = registro generico che verrà scelto dal compilatore. Ha un indice associato, quindi è “recuperabile”. 
+- **m** = locazione di memoria generica che verrà scelta dal compilatore. 
+- **i/I** = operando a 64/32 bit immediato. 
+- **a** = eax (o una sua variante come rax, ax, al dipendentemente dalla dimensione degli operandi).  
+- **b** = ebx (o una sua variante come rbx, bx, bl dipendentemente dalla dimensione degli operandi). 
+- **c** = ecx (o una sua variante come rcx, cx, cl dipendentemente dalla dimensione degli operandi). 
+- **d** = edx (o una sua variante come rdx, dx, dl dipendentemente dalla dimensione degli operandi). 
+- **S** = esi. 
+- **D** = edi.
+- **0-9** = indici degli operandi (e.g. se a è il primo operando a essere utilizzato all’interno dell’ASM inline, può essere identificato con l’indice 0). 
+- **q** = registro che può essere utilizzato per indirizzare un singolo byte (e.g. `eax` che incapsula `al`).
+
+### Esempio di utilizzo di ASM inline
+
+Vediamo un esempio di funzione che può essere invocata all’interno di un loop e ha lo scopo di misurare il tempo impiegato per effettuare un accesso in memoria in caso di cache miss.
+
+```c
+unsigned long probe (char* adrs) {
+ volatile unsigned long cycles;
+ asm ( “mfence \n” //barriera per qualunque accesso in memoria
+       “lfence \n” //barriera per gli accessi in memoria di tipo load 
+       “rdtsc \n” //preleva il timer da un registro specifico e 
+                   //carica i 32 bit meno significativi in eax e 
+                   //i 32 bit più significativi in edx 
+       “lfence \n” “movl %%eax, %%esi \n” //carica i 32 bit meno 
+                                          //significativi del timer in esi 
+       “movl (%1), %%eax \n”  //effettua l’accesso in memoria 
+                              //(in particolare alla variabile adrs,
+                              // salvata in %1=ecx) 
+       “lfence \n” 
+       “rdstc \n”  //preleva il nuovo timer  
+       “subl %%esi, %%eax \n” //sottrae i 32 bit meno significativi 
+                              //dei due timer, che corrisponde al 
+                              //tempo impiegato per l’accesso in memoria 
+       “clflush 0 (%1) \n” //effettua il flush di adrs dalla cache 
+       : “=a” (cycles)  //dopo l’esecuzione dell’ASM inline, il contenuto 
+                        //di eax (registro 0) andrà nella variabile cycles 
+       : “c” (adrs)  //prima dell’esecuzione dell’ASM inline, il contenuto 
+                     //di adrs va nel registro ecx (registro 1) 
+       : “%esi”, “%edx” ); //esi, edx sono i clobbers    
+      return cycles;
+}
+
+
+```
+
+Eliminando la sola istruzione `clflush`, è possibile misurare il tempo impiegato per effettuare gli accessi in memoria in caso di cache hit.
+
+$NB_1:$ gli attacchi Meltdown e Spectre utilizzano proprio questo costrutto qui.
+
+
+$NB_2$: esistono delle API di C che implementano l’invocazione di rdtsc e clflush, e sono rispettivamente `__rdtscp()` e `_mm_clflush()`.
+
+
+$NB_3:$ i registri `eax`, `ecx` non sono stati inseriti tra i clobbers perché sono **caller** **save**: sono registri che, a ogni chiamata di funzione, vengono salvati dalla funzione chiamante, cosicché la funzione chiamata possa utilizzarli a piacimento.
+
+
+
+#### Altri dettagli su Flush + Reload
+
+È possibile rendere l’istruzione `rdtsc` *privilegiata*, ovvero si può fare in modo che venga invocata esclusivamente a livello kernel. Tuttavia, l’attacco **Flush+Reload**, per andare a buon fine, non ha la stretta necessità di sfruttare `rdtsc` per tenere traccia del trascorrere del tempo: esiste un modo altresì efficace per emulare un timer a grana sufficientemente fine. In pratica è sufficiente creare un nuovo thread che dovrà eseguire la seguente funzione: 
+
+```c
+void *time_keeper (void *dummy) {  
+  while(1){
+            timer = (timer+1); //timer è una variabile globale 
+          }
+}
+```
+
+**NB**: una variabile volatile è toccabile da più entità, non è nel registro del singolo thread. Evitiamo quindi ottimizzazioni, prendo e scrivo in memoria.
+
+Un’altra cosa che vale la pena osservare è che questo tipo di attacco ha una probabilità di gran lunga minore di avere successo nel caso in cui si abbiano le *cache non inclusive*. Supponiamo che il thread $T_A$ della vittima giri sul CPU-core$_A$ e il thread $T_B$ dell’attaccante giri sul CPU-core$_B$. Se le cache sono *non inclusive*, qualunque blocco di memoria acceduto da parte di $T_A$ viene caricato sulla cache di livello 1 propria di CPU-core$_A$ ma magari non sulle cache di livelli inferiori. A tal punto, $T_B$ non può vedere in alcun modo sulla cache il valore utilizzato dal thread $T_A$: al livello L1 non è presente perché ciascun CPU-core ha la sua copia privata della cache di livello L1; ai livelli sottostanti, invece, *il dato non è proprio presente*. Se lavoro su una cache in uso *esclusivo*, cioè ho ad esempio due core sulla stessa cpu che condividono risorse, le tempistiche sono più veloci in quanto non mi sposto tra stati diversi.
+
+## Memory Consistency
+
+Con riferimento al *memory wall*, se imponessimo che tutte le istruzioni che prevedono un’interazione con la memoria effettuino l’accesso vero e proprio alla memoria immediatamente, avremmo un degrado delle prestazioni, dovuto al fatto che l’*accesso alla memoria richiede molti cicli di clock*;  
+Per esempio, se abbiamo un’istruzione A che scrive un dato sulla memoria e un’istruzione B che legge il medesimo dato dalla memoria, B deve attendere che il dato sia disponibile in cache o in RAM prima di essere finalizzata, allora le ottimizzazioni effettuate sulla pipeline vanno vanificate. Di conseguenza, è necessario un meccanismo che disaccoppi le visioni di:
+
+- Come (e in quale ordine) le istruzioni di accesso alla memoria vengono viste dal **processore che le esegue** (**program** **order**) 
+
+- Come (e in quale ordine) le istruzioni di accesso alla memoria vengono viste dagli **altri processori** / program flow mediante l’utilizzo delle risorse condivise nell’architettura di memoria, come la cache o la RAM (**visibility** **order**).
+
+Tale meccanismo prevede l’utilizzo degli **store buffer**, che sono delle piccole aree di **memoria** **private per una CPU-core**, che mantengono temporaneamente i dati prodotti dalle istruzioni finalizzate ma ancora non riportate in cache o in RAM. In particolare, l’ordine con cui saranno viste le operazioni in memoria da parte degli altri program flow non corrisponde necessariamente con l’ordine in cui le istruzioni sono uscite dalla pipeline, e tale ordine dipende dal modello di consistenza della memoria utilizzato. *Non stiamo parlando di Cache coherency, perchè qui ancora non sappiamo se la scrittura in cache sia stata effettuata.*
+
+## Consistenza sequenziale
+
+### Definizione di Lamport, 1979
+
+Un sistema multiprocessore è sequenzialmente consistente se il risultato di una qualunque esecuzione è lo stesso rispetto a se le operazioni di tutti i processori fossero eseguite in qualche ordine sequenziale e le operazioni di ciascun processore preso singolarmente apparissero in tale sequenza esattamente nell’ordine specificato dal suo programma.
+
+In altre parole, per avere consistenza sequenziale, *non è possibile* *avere un’inversione delle istruzioni* *di uno specifico* *program* *order all’interno della sequenza globale delle operazioni.*
+
+#### Esempio
+
+Supponiamo che CPU-core$_1$ debba eseguire le operazioni $a_1$, $b_1$ (dove $a_1$ viene prima di $b_1$ nel *program order*), e supponiamo che CPU-core$_2$ debba eseguire le operazioni $a_2$, $b_2$ (dove $a_2$ viene prima di $b_2$ nel program order). Allora, una sequenza che rispetta la consistenza sequenziale è data da:  
+$a_1, a_2, b_1, b_2$   
+Invece, una sequenza che non rispetta la consistenza sequenziale è data da:   $b_1, a_2, b_2, a_1$.   
+Infatti, tale sequenza vede $b_1$ prima di $a_1$, il che rappresenta un’inversione rispetto all’ordine di programma proprio di CPU-core$_1$.
+
+
+Nel mondo reale, la stragrande maggioranza delle macchine hanno dei chipset che non sono realizzati per soddisfare la consistenza sequenziale. Ma come mai questa scelta se la consistenza sequenziale è fondamentale per la correttezza di molte applicazioni concorrenti? Per *motivi di scalabilità* dell’architettura di memoria e di *costi* legati alla sequential consistency; tra l’altro, la consistenza sequenziale impone un ordinamento fisso per tutte le operazioni, anche per quelle completamente scorrelate tra loro. Algoritmi come *Bakery* o *Dekker* non vanno bene per le architetture odierne perchè *non lavorano in questo modo*. Come si comportano quindi i computer moderni?
+
+### Total Store Order TSO
+
+È il modello di consistenza preferito nelle architetture reali, come x86 e SPARC. È basato sull’idea per cui *effettuare lo store dei dati non è equivalente* *al riportare effettivamente* *tali dati* *n**ell’architettura di memoria**.* Quest’ultima operazione viene tipicamente **ritardata** rispetto al commit dell’istruzione di store; ad esempio, si potrebbe dover attendere che la linea di cache su cui si dovrà scrivere il nuovo valore passi allo stato exclusive.
+
+È proprio questo il modello di consistenza che prevede lo **store buffer**. In particolare, nel momento in cui un’istruzione di `store` viene committata, il contenuto da scrivere poi in memoria viene nel frattempo inserito all’interno dello *store buffer*, che risulta essere un componente intermedio tra il CPU-core e l’architettura di memoria (cache + RAM). Ricordiamo che, dopo aver committato un’istruzione, questa *non passa subito da Store Buffer a Cache*, bensì passa un certo tempo. Solo dopo che va in cache, il risultato di tale istruzione risulta *visibile*.  
+
+
+*Non sarebbe meglio andare direttamente in cache, in modo che i dati prodotti siano subito disponibili?*  
+
+Il problema di questa idea risiede nell’automa **Mesi**. Come sappiamo, la linea di cache su cui scriviamo deve essere esclusiva, e questo richiede step intermedi come l’uso del *broadcat medium*, la richiesta di esclusività etc... Solo quando ho effettivamente queste condizioni passo a copiare in cache.  
+Capiamo subito che operare sulla cache è un’operazione abbastanza delicata. Lo Store Buffer, invece, è a uso dedicato del flusso in corso, non ho conflitti con altri thread. L’unica limitazione è che altri non vedono ciò che produco. Come vedremo dopo, gli Store Buffer, in x86 hanno una gestione FIFO, e possiamo usare alcune funzioni per forzare la scrittura in memoria.
+
+Il TSO è un modello di consistenza che offre anche dei grossi vantaggi:
+
+- Se nel program order di un CPU-core si hanno due istruzioni A, B, di cui A effettua una store di un dato $X$ e B va a rileggere quel dato $X$, allora B ha la possibilità di recuperare il dato aggiornato andando semplicemente a leggere nello store buffer. In tal modo si risparmiano diversi cicli di clock per finalizzare le istruzioni perché chiaramente un **accesso allo store buffer è molto più veloce di un accesso alla cache.** 
+
+- È possibile effettuare il packaging delle informazioni da riportare nell’architettura di memoria. Se si hanno molteplici operazioni di scrittura che insistono sul medesimo blocco di memoria, si hanno altrettanti accessi allo store buffer ma poi lo store buffer dovrà *interagire con l’architettura di cache solo una volta*. Questo chiaramente riduce i costi di accesso alla memoria.
+
+Tuttavia, il TSO non offre consistenza sequenziale perché, se abbiamo due istruzioni A, B in cui A viene prima di B nel program order, è possibile riportare nell’architettura di memoria prima gli effetti di B e poi gli effetti di A. In particolare, la presenza dello store buffer causa il **load-store bypass**, che è un fenomeno che si verifica quando si hanno due istruzioni A, B di cui A è una `store` di un dato $X$ eseguita da un certo thread $T_A$, mentre B è una `load` del medesimo dato $X$ eseguita da un altro thread $T_B$ in un’istante successivo rispetto ad A. Di fatto, in tal caso, quando l’istruzione A viene finalizzata, il dato da essa prodotto potrebbe trovarsi soltanto nello store buffer. Di conseguenza, se il thread $T_B$ gira su un CPU-core *diverso* rispetto a $T_A$, nel momento in cui deve andare ad accedere al dato $X$, *può farlo solo mediante la cache / RAM, per cui esegue la `load` di una versione* *vecchia di $X$.*
+
+**L’effetto finale è che l’istruzione B viene resa visibile prima dell’istruzione A.**
+
+Un’altra considerazione da fare è che *non necessariamente lo store buffer segua la disciplina FIFO*. (in *x86* si, in altre architetture no). Nel caso in cui non lo si segue, si ha lo **store-store bypass**, secondo cui due istruzioni di `store` successive possono essere invertite nel visibility order.
+
+### Memory Fencing
+
+Il programmatore ovviamente deve avere la possibilità di prevenire i fenomeni di `load-store` bypass e `store-store` bypass per rendere corretto il software che sta sviluppando. Corrono così in aiuto tre categorie di istruzioni di **memory** **fencing** (= sincronizzazione delle attività che vengono eseguite sulla memoria), che sono:
+
+- **SFENCE** (Store Fence): serializza le operazioni di *store* verso la memoria; tutte le store *precedenti* a lei vengono riversate in memoria prima dell’esecuzione di qualunque altra istruzione di store successiva a lei. 
+
+- **LFENCE** (Load Fence): serializza le operazioni di *load* dalla memoria; tutte le load precedenti a lei vengono completate prima dell’esecuzione di qualunque altra istruzione di load successiva a lei. 
+
+- **MFENCE** (Memory Fence): serializza tutte le operazioni in memoria; è un tipo di istruzione che unisce le capability di *sfence* e di *lfence*.
+
+NON devo abusare di queste istruzioni, ma usarle con criterio per contesti delicati, altrimenti è come se stessi flushando la pipeline in ogni operazione.
+
+Queste istruzioni sono garantite essere ordinate rispetto a qualsiasi altra istruzione serializzante (serializing instruction), come `cpuid` (che, se ricordiamo, effettua, tra le varie cose, lo squash della pipeline).
+
+Inoltre, esistono delle istruzioni che, se precedute dal prefisso **lock**, diventano istruzioni serializzanti. Con *lock* si ha un approccio del tipo *blocco, lavoro, rilascio.* Quando lavoro è linearizzabile, grazie al lock vedo l’effetto delle altre attività.   
+Queste sono: `add`, `adc`, `and`, `btc`, `btr`, `bts`, **cmpxchg**, `dec`, `inc`, `neg`, `not`, `or`, `sbb`, `sub`, `xor`, `xand`.
+
+#### Esempio cmpxchg
+
+Significa *compare then exchange*, ha due operandi ($o_1$, $o_2$, dove $o_1$ può essere una locazione di memoria) e compara il contenuto di $o_1$ col registro `rax`/ `eax` / `ax` / `al`.   
+
+- Se i due valori sono **uguali**, allora il contenuto di $o_2$ viene riversato in $o_1$; 
+
+- Altrimenti, il contenuto di $o_2$ viene copiato in `rax` / `eax` / `ax` / `al`.
+
+Si tratta di un’istruzione che può effettuare un primo accesso in memoria, una comparazione e poi un secondo accesso in memoria, per cui **non è atomica**. Se la si vuole eseguire in modo atomico, si utilizza appunto il prefisso **lock**, quindi ho una linea di cache esclusiva per me. Eseguire `cmpxchg` in modo **atomico** vuol dire riversare gli aggiornamenti in memoria già al completamento dell’istruzione stessa, per cui *non ci si può appoggiare allo store buffer*. Di conseguenza, è richiesto che, prima della `lock cmpxchg`, il contenuto dello *store buffer* venga riportato all’interno dell’architettura di memoria. È tale caratteristica che rende l’istruzione *serializzante* (ma, a differenza di `cpuid`, non effettua lo squash della pipeline).
+
+La `lock cmpxchg` viene utilizzata anche per implementare i *lock* (e in particolare gli *spinlock*) per gli accessi in sezione critica. Per fare un esempio, di seguito è riportata una funzione C contenente un ASM inline, che implementa un trylock mediante cmpxchg  
+$NB$: trylock = se non riesco a ottenere il lock, non rimango in attesa e lascio perdere).
+
+```c
+int try_lock (void *uadr) { //uadr = indirizzo dove si trova il lock
+     unsigned long r = 0; 
+     asm volatile (  
+          “xor %%rax, %%rax\n” //rax = 0, sto azzerando il contenuto.  
+          “mov $1, %%rbx\n” //rbx = 1  
+          “lock cmpxchg %%rbx, ($1)\n” //if (uadr == 0) uadr = 1
+          “sete (%0)\n” //if (“cmpxchg had success”) r = 1 
+          : : “r” (&r), “r” (uadr) //prima dell’esecuzione dell’ASM inline, 
+                                   //due registri qualsiasi vengono popolati con &r, uadr 
+          : “%rax”, “%rbx” //rax, rbx sono i clobbers
+       );
+     return (r) ? 1 : 0; //if (“cmpxchg had success”) return 1; else return 0 }
+}
+```
+
+Le istruzioni come la `cmpxchg` che eseguono la `load` di una locazione $L$ di memoria in un registro, modificano il valore di tale registro ed eseguono la store del nuovo contenuto del registro all’interno della locazione $L$ di memoria sono le cosiddette istruzioni **Read-Modify-Write** (**RMW**).   
+Ci permettono di rendere le operazioni globalmente visibili.
+
+Anche qui esistono delle API di C che implementano l’invocazione di sfence, lfence, mfence e cmpxchg, e sono rispettivamente:
+
+`_mm_sfence()`,`_mm_lfence()`, `_mm_mfence()` e `sync_bool_compare_and_swap()`  
+
+
+In ogni caso, utilizzare le istruzioni **RMW** per implementare i lock non è una soluzione particolarmente scalabile per realizzare degli schemi di coordinazione. Infatti, con lo spinlock, si ha un thread in sezione critica e tanti thread in *busy waiting*, per cui se disgraziatamente il thread in sezione critica viene *deschedulato* (ciò avviene comunemente se giro su una VM), si ha non solo un ritardo ma anche uno spreco di risorse e di energia da parte di chi è in *busy waiting*. Con lock, la linea di cache è a mio uso esclusivo.  
+Per questo motivo, si preferisce proporre degli algoritmi che prevedono un utilizzo alternativo delle istruzioni RMW e, a tal proposito, si hanno due possibilità principali che **non richiedono Lock**: 
+
+- **Non-blocking coordination** (lock-free / wait-free synchronization). 
+  Nel caso *lock-free*, posso ottenere degli abort, e quindi ritento (alg. Linearizzabile). Nel caso *wait-free*, non ho mai abort, ed è consistente.
+
+- **Read Copy Update** (**RCU**). Include *Read intensive + aggiornamento*. 
+  Tecnica che *non è bloccante solo per chi legge* la struttura dati, mentre per chi aggiorna deve serializzare. Qui stiamo totalmente cambiando approccio, è un diverso modo di fare.  
+
+Cosa usare è influenzato dal "con cosa sto lavorando"!
+
+
+
+### Linearizzabilità
+
+Supponiamo di avere una struttura dati $S$ e delle funzioni che accedono a $S$; diciamo che un’esecuzione concorrente di tali funzioni è corretta se è **linearizzabile**, ovvero *se è come se le operazioni fossero eseguite in modo sequenziale* (dove quella successiva viene eseguita solo dopo il completamento della precedente). Questo è vero se: 
+
+- Gli accessi concorrenti a $S$, nonostante possano durare diversi cicli di clock, possono essere visti come se i loro effetti si materializzassero in un unico punto del tempo.
+
+- Tutte le operazioni che si sovrappongono nel tempo possono essere ordinate in base al loro istante di materializzazione selezionato.
+
+#### Esempio
+
+Supponiamo di avere tre funzioni A, B, C che accedono a una stessa struttura dati condivisa, e supponiamo di avere due thread $T_1$, $T_2$, di cui $T_1$ invoca la funzione A mentre $T_2$ invoca la funzione B e successivamente la funzione C.  
+Allora vale ciò che è riportato nella figura seguente:
+
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-19-19-08-11-42.png)
+
+*Siamo solamente sicuri che B venga prima di C, non possiamo dire altro.*   
+Tuttavia, lo studio di algoritmi concorrenti che utilizzano la materializzazione istantanea delle operazioni non è così banale. Ad esempio, in presenza di un salto condizionale, una determinata operazione può essere materializzata in istanti differenti a seconda se il salto viene preso oppure no.
+
+**Osservazione**: Lavorare con istruzioni *atomiche* vuol dire *bloccare una linea di cache*, quindi *non ho concorrenza su un qualcosa che è solo mio*, al massimo posso averla se opero su linee diverse.   
+Prendiamo l’esempio sopra:  
+Siamo sicuri che il thread $T_2$, quando esegue l’operazione C, riesca a vedere tutto ciò che è stato fatto in B? (sopra è quasi stato dato per scontato!).  
+In un caso di *Sequential Consistency*, sì (anche se noi non operiamo in questo contesto), altrimenti non è scontato. Ad esempio, il thread potrebbe essere stato spostato su una CPU diversa, e prima di andarci lo Store Buffer nella vecchia CPU non è stato flushato. Quindi nella nuova CPU non posso recuperare il “vecchio Store Buffer”.
+
+### Linearizzabilità  vs operazioni RMW
+
+Le operazioni RMW (Read-Modify-Write), nonostante implementino accessi in memoria non banali, appaiono in modo atomico sull’intera architettura hardware. Di conseguenza, possono essere sfruttate per definire dei punti di linearizzazione delle operazioni, in modo tale da ordinare le operazioni in una storia linearizzabile. Inoltre, le operazioni RMW possono fallire; di conseguenza il loro esito, come per i salti condizionali, può influenzare l’esecuzione o la non-esecuzione di una particolare istruzione e l’istante in cui essa viene eventualmente materializzata.
+
+Sappiamo che con le operazioni RMW è possibile implementare un meccanismo di locking. I lock basati su RMW incentivano ancor più la linearizzazione, poiché portano le operazioni a essere eseguite in modo sequenziale.

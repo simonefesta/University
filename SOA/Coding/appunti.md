@@ -11,6 +11,15 @@ In un’area di memoria metto un segreto, e non vi accedo più. Posso istruire p
 Ora l’attacco: inizio ad addestrare, a volte con valori corretti, a volte con valori ‘maliziosi’ (circa uno ogni sei). In`side_effect_maker(x)` prendo in input $x$, se $x < 1$, ovvero $x = 0$ prendo l’info, vado nello zeresimo elemento per accedere al mio array. Se $x>1$ eseguirò speculativamente, entrerà nello zeresimo byte e poi nella linea di cache che leggerò. Se ho casce hit va bene, sennò riprovo.  
 Nel `memory_reader`, per ogni entry delle 256, mi spiazzio di 12, leggo il *byte 0*, se *tempo < threshold*, ho cache hit e stampo tutte le info.
 
+### False cache sharing
+
+Cache impattata quando creo struct ad esempio. Devo applicare politica *Loosely Related Fields*, cioè se un’operazione tocca due zone disgiunte, queste devono essere in due linee diverse di cache. Se fossero su stessa linea di cache, creerei un *False Cache Sharing*. Se le zone solo correlate, allora sono *Strong Related* e uso un’unica linea di cache. **Esempio**: Spawno due thread, uno legge e l’altro scrive su un vettore di interi (4 byte/entry), operazioni conflittuali. Writer aggiorna *v[0]*, Reader legge in una zona *v[TARGET].* Se TARGET >= 16, vuol dire che mi sto spaziando, dall’entry iniziale, di 16*4 = 64 byte, che è *una linea di cache.* Stiamo quindi dicendo che i due thread operano su due linee di cache diverse. Questa run è molto più veloce di un’altra con  
+ TARGET <16, perchè i thread vanno in conflitto sulla singola linea di cache.  
+ NB: Tutte le operazioni stanno nello **Store buffer**, non in cache, solo con **nfence** vanno in cache. (Nel codice c’è infatti **nfence**).  
+ E’ possibile avere una run veloce anche con TARGET < 16?  
+ Si. Se la macchina è 2core/4thread (vedi slide *Baseline OOO, con due motori sotto)*, posso, tramite *0x5 ./a.out*, usare due hyperthread su stesso core (5 = 0101, uso lo 0-esimo e il secondo). Perchè lavora meglio? Perchè stanno **lavorando su stessa replica**, e non devono cambiare stato .  
+ (MESI è tra cache “diverse”, non nella singola). Essi accedono alla stessa memoria cache L1 e L2 del core e condividono la stessa copia dei dati. Senza *affinità*, i thread vengono mossi tra core diversi.
+
 ## Locked List.c
 
 Abbiamo due tipi di utilizzo:
