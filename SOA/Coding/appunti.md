@@ -415,3 +415,42 @@ Questo viene fatto da un thread associato ad uno specifico processo.
 Il blocco `while(!copy_from_user((void...)` è bloccante, può generare dei fault. Non potrei eseguirla, allora installo altro modulo. Sostanzialmente, se la cpu va ad altri, viene installato il contesto dell'altro e viene eseguito. Quando ritorno io, mi viene restorato il mio contesto, preso dalla variabile `per-cpu`.
 
 Nel modulo dichiaro variabile `per-cpu` per la discovery, per spostarmi nell'area in cui c'è oggetto il cui valore è pari a `kp`, cioè variabile di cui devo fare l'aggiustamento. C'è codice `brute force`, si può fare solo quando installiamo il modulo, una volta solo. Devo fare eseguire tale funzione su tutte le cpu.
+
+# 22 novembre
+
+Ci troviamo in **Kernel LEVEL TASK MANAGEMENT**.
+
+In particolare, iniziamo con **Tasklets.c**
+
+Abbiamo struttura dati `_packed_task` che include a sua volta un'altra struttura dati.
+Nell'*init module*, c'è del lavoro che deve essere processato deferred, svariati controlli. Alla fine abbiamo una `put_work`, in base alla presenza o assenza del wrapper.
+Esaminiamo la syscall`put_work`, facciamo un `try_module_get`, per la richiesta del deferred work. Poi allochiamo, con `zalloc`, in modo atomico, memoria. Se ho problemi rilasciamo. Altrimenti andiamo in `the_task`, campo buffer, e vi scriviamo dei task. Ha un pointer che punta a se stessa, per il retrieve automatico. Il campo request_code è il parametro passato alla syscall.
+
+Inizializziamo la tasklet, in particolare la struttura presente nella struttura allocata. `&the_task->the_tasklet.audit`. Scheduliamo sulla cpu *corrente*, dove sto eseguendo il servizio. In `printk`, o `tasklet_init`, potrei essere migrato, quando scheduliamo su cpu corrente, no.  In `code` c'è il codice della specifica chiamata.
+Viene usato su `data` il `container_of` per il retrieve. Poi facciamo `kfree` per liberare la memoria, e successivamente decremento il contatore d'uso, perchè c'è stato processamento. Ora ritorniamo al demone, che lavora su software esterno. Posso smontarlo? dipende dal valore del counter.
+
+Montiamo con `sudo make mount`, ci da indirizzo SYSCALL TABLE, e prende indirizzo 134, il primo libero. In `ser.c`,la chiamata della funzione è `syscall-num`.  L'avvio del codice è sul cpu-core1, quindi la print è software queue demon. Se mettessi `taskset 0x1`viene tutto dirottato sulla cpu0. Rimuoviamo con `sudo rrmod the_tasklets.ko`
+
+## Work queue
+
+In `work_queues.c`, abbiamo sempre `audit`, la quale manda in print qualcosa dalla workqueue. Anche qui abbiamo `module_put`, perchè esso deve essere presente. Nella syscall, prendo e blocco il modulo, il parametro ulteriore è la cpu su cui eseguire il lavoro, ovviamente deve essere presente! Sempre `kzalloc` atomica, prendo il buffer, controllo se sia stato preso. Poi inizializziamo con `__INIT_WORK`, in cui eseguiamo la funzione `the_audit`, il parametro ulteriore è la tabella interna, non quella esterna, che possiamo trovare con `container_of`.
+In `schedule_work` passiamo proprio l'address della tabella interna.
+
+#### Parte User
+
+Vuole usage con numero di processing unit.
+Opera similmente a quello già visto.
+
+### Lancio
+
+`./a.out 134 1`, eseguiamo sempre su cpu1, anche se uso `tasket 0x1`, sempre su 1 eseguo il deferred work. Poi rimuoviamo anche questo modulo.
+
+## Interceptor
+
+In `hook.c`, viene fatta `copy_from_user`, è bloccante, perchè è possibile page fault. Ma stiamo in `kernel return prob`, non potrei scrivere codice bloccante. Soluzione: annullo contesto corrente, e poi lo rimetto a posto. Ma quindi devo abiliare *preemption*, perchè se annullo il concetto del contesto, annullo anche il concetto di preemtability. Se così non fosse, il codice avrebbe dei safe-places non usabili se non lo riattivo con `preempt_enable`, poi alla fine `preempt_disable`, quando passo il controllo al sottosistema di kernel probe.
+
+La logica del codice è:
+Ho un thread, che chiama `sys_read()` (siamo scesi nel kernel) e poi `return probe`, la quale sa dove e quanti dati sono stati consegnati, vedendo snapshot cpu del ritorno del blocco di codice, mediante MACRO. Se ho stato di blocco nella sycall, resto fermo (es: aspetto che page fault sia risolto). Ad esempio, la `copy_from_user`, avvenendo in un ciclo, potrebbe accedere a pagine "più avanti" quando la richiamo. Nella return probe stiamo lavorando su **per-cpu variabile***, puntata da *temp. Inizialmente c'è null, non sto in contesto di kernel probe, poi alla fine rimetto a posto il contesto originale. E se venissi rischedulato su **altra cpu**?
+
+La variabile per-cpu non è all'indirizzo temp, ma in un altro indirizzo. Sto corrompendo la variabile per-cpu di un'altra cpu. Ciò avviene se i servizi vanno in pree-emption oppure vanno in blocco, posso essere rimesso su altra cpu. Soluzione? Devo aggiungere altro!
+Soluzione parziale: affinità, ma poi lo forzo a lavorare solo lì!

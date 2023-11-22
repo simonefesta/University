@@ -825,7 +825,6 @@ Supponiamo di avere un thread A che deve eseguire delle operazioni di scrittura 
 
 Comunque sia, dobbiamo essere attenti anche allo scenario duale: se il thread A deve eseguire delle operazioni correlate tra loro sia sul dato $X$ che sul dato $Y$, stavolta è opportuno avere $X$ e $Y$ sulla stessa linea di cache: in tal modo, diminuiamo la probabilità di ritrovarci dei dati scorrelati all’interno del blocco in cui si trovano $X$ e $Y$.
 
-
 ![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-19-16-34-16-38.png)
 
 Se `ALIGNMENT = 64`, sto allineando esattamente a una linea di cache. Parto sicuramente da li, poi in base alla size potrei eccedere.
@@ -917,21 +916,15 @@ unsigned long probe (char* adrs) {
        : “%esi”, “%edx” ); //esi, edx sono i clobbers    
       return cycles;
 }
-
-
 ```
 
 Eliminando la sola istruzione `clflush`, è possibile misurare il tempo impiegato per effettuare gli accessi in memoria in caso di cache hit.
 
 $NB_1:$ gli attacchi Meltdown e Spectre utilizzano proprio questo costrutto qui.
 
-
 $NB_2$: esistono delle API di C che implementano l’invocazione di rdtsc e clflush, e sono rispettivamente `__rdtscp()` e `_mm_clflush()`.
 
-
 $NB_3:$ i registri `eax`, `ecx` non sono stati inseriti tra i clobbers perché sono **caller** **save**: sono registri che, a ogni chiamata di funzione, vengono salvati dalla funzione chiamante, cosicché la funzione chiamata possa utilizzarli a piacimento.
-
-
 
 #### Altri dettagli su Flush + Reload
 
@@ -975,7 +968,6 @@ $a_1, a_2, b_1, b_2$ 
 Invece, una sequenza che non rispetta la consistenza sequenziale è data da:   $b_1, a_2, b_2, a_1$.   
 Infatti, tale sequenza vede $b_1$ prima di $a_1$, il che rappresenta un’inversione rispetto all’ordine di programma proprio di CPU-core$_1$.
 
-
 Nel mondo reale, la stragrande maggioranza delle macchine hanno dei chipset che non sono realizzati per soddisfare la consistenza sequenziale. Ma come mai questa scelta se la consistenza sequenziale è fondamentale per la correttezza di molte applicazioni concorrenti? Per *motivi di scalabilità* dell’architettura di memoria e di *costi* legati alla sequential consistency; tra l’altro, la consistenza sequenziale impone un ordinamento fisso per tutte le operazioni, anche per quelle completamente scorrelate tra loro. Algoritmi come *Bakery* o *Dekker* non vanno bene per le architetture odierne perchè *non lavorano in questo modo*. Come si comportano quindi i computer moderni?
 
 ### Total Store Order TSO
@@ -983,7 +975,6 @@ Nel mondo reale, la stragrande maggioranza delle macchine hanno dei chipset che 
 È il modello di consistenza preferito nelle architetture reali, come x86 e SPARC. È basato sull’idea per cui *effettuare lo store dei dati non è equivalente* *al riportare effettivamente* *tali dati* *n**ell’architettura di memoria**.* Quest’ultima operazione viene tipicamente **ritardata** rispetto al commit dell’istruzione di store; ad esempio, si potrebbe dover attendere che la linea di cache su cui si dovrà scrivere il nuovo valore passi allo stato exclusive.
 
 È proprio questo il modello di consistenza che prevede lo **store buffer**. In particolare, nel momento in cui un’istruzione di `store` viene committata, il contenuto da scrivere poi in memoria viene nel frattempo inserito all’interno dello *store buffer*, che risulta essere un componente intermedio tra il CPU-core e l’architettura di memoria (cache + RAM). Ricordiamo che, dopo aver committato un’istruzione, questa *non passa subito da Store Buffer a Cache*, bensì passa un certo tempo. Solo dopo che va in cache, il risultato di tale istruzione risulta *visibile*.  
-
 
 *Non sarebbe meglio andare direttamente in cache, in modo che i dati prodotti siano subito disponibili?*  
 
@@ -1055,7 +1046,6 @@ Anche qui esistono delle API di C che implementano l’invocazione di sfence, lf
 
 `_mm_sfence()`,`_mm_lfence()`, `_mm_mfence()` e `sync_bool_compare_and_swap()`  
 
-
 In ogni caso, utilizzare le istruzioni **RMW** per implementare i lock non è una soluzione particolarmente scalabile per realizzare degli schemi di coordinazione. Infatti, con lo spinlock, si ha un thread in sezione critica e tanti thread in *busy waiting*, per cui se disgraziatamente il thread in sezione critica viene *deschedulato* (ciò avviene comunemente se giro su una VM), si ha non solo un ritardo ma anche uno spreco di risorse e di energia da parte di chi è in *busy waiting*. Con lock, la linea di cache è a mio uso esclusivo.  
 Per questo motivo, si preferisce proporre degli algoritmi che prevedono un utilizzo alternativo delle istruzioni RMW e, a tal proposito, si hanno due possibilità principali che **non richiedono Lock**: 
 
@@ -1067,9 +1057,7 @@ Per questo motivo, si preferisce proporre degli algoritmi che prevedono un utili
 
 Cosa usare è influenzato dal "con cosa sto lavorando"!
 
-
-
-### Linearizzabilità
+## Linearizzabilità
 
 Supponiamo di avere una struttura dati $S$ e delle funzioni che accedono a $S$; diciamo che un’esecuzione concorrente di tali funzioni è corretta se è **linearizzabile**, ovvero *se è come se le operazioni fossero eseguite in modo sequenziale* (dove quella successiva viene eseguita solo dopo il completamento della precedente). Questo è vero se: 
 
@@ -1092,8 +1080,46 @@ Prendiamo l’esempio sopra:
 Siamo sicuri che il thread $T_2$, quando esegue l’operazione C, riesca a vedere tutto ciò che è stato fatto in B? (sopra è quasi stato dato per scontato!).  
 In un caso di *Sequential Consistency*, sì (anche se noi non operiamo in questo contesto), altrimenti non è scontato. Ad esempio, il thread potrebbe essere stato spostato su una CPU diversa, e prima di andarci lo Store Buffer nella vecchia CPU non è stato flushato. Quindi nella nuova CPU non posso recuperare il “vecchio Store Buffer”.
 
-### Linearizzabilità  vs operazioni RMW
+## Linearizzabilità vs operazioni RMW
 
 Le operazioni RMW (Read-Modify-Write), nonostante implementino accessi in memoria non banali, appaiono in modo atomico sull’intera architettura hardware. Di conseguenza, possono essere sfruttate per definire dei punti di linearizzazione delle operazioni, in modo tale da ordinare le operazioni in una storia linearizzabile. Inoltre, le operazioni RMW possono fallire; di conseguenza il loro esito, come per i salti condizionali, può influenzare l’esecuzione o la non-esecuzione di una particolare istruzione e l’istante in cui essa viene eventualmente materializzata.
 
 Sappiamo che con le operazioni RMW è possibile implementare un meccanismo di locking. I lock basati su RMW incentivano ancor più la linearizzazione, poiché portano le operazioni a essere eseguite in modo sequenziale.
+
+
+
+![43.png](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/50b82687af4964513805ec4a7d0a751fe8a041b4.png)
+
+Ma, come dicevamo in precedenza, preferiamo delle tecniche alternative all’utilizzo dei lock per sincronizzare i thread mediante operazioni RMW. Analizziamole ora. Con *lock* si ha un approccio del tipo *blocco, lavoro, rilascio* come è già stato detto. Utile per operazioni in tempo reale su strutture condivise, ma poco scalabile. Poi, con *fence, le rendo effettivamente visibili.* Vediamo delle alternative:
+
+### Non-blocking coordination
+
+È un tipo di sincronizzazione **non bloccante**, che prevede due possibili approcci:
+
+1) **Lock-freedom:** almeno un’istanza di una chiamata a funzione termina con successo in tempo finito AND tutte le istanze di chiamata a funzione terminano in tempo finito (o con successo o no). *Se fallisco, posso ricominciare da zero.*
+
+2) **Wait-freedom** tutte le istanze di una chiamata a funzione terminano con successo in tempo finito. *Tutto quello che faccio va “sempre bene”*. Dipende però con che struttura lavoro.
+
+### Sincronizzazione lock-free
+
+Prevede la seguente logica: se due operazioni ordinate sono incompatibili (ovvero portano a fallire una qualche operazione RMW), allora una di loro può essere accettata ma l’altra deve essere rifiutata ed eventualmente rieseguita con una nuova try. Perciò, sono algoritmi basati sulla logica **abort** **/** **retry**: se una qualche operazione non va a buon fine, viene semplicemente abortita e in caso si effettua un nuovo tentativo. Chiaramente, per essere un approccio efficiente, deve essere caratterizzato da un basso numero di abort, in modo tale da non sprecare troppo lavoro eseguito in CPU e nell’hardware in generale. 
+
+Un grosso vantaggio della sincronizzazione *lock-free* è che non dà problemi nel caso in cui un thread dovesse crashare. Infatti, qui il comportamento di ciascun thread è *indipendente* da quello che succede a tutti gli altri thread; nel caso in cui si utilizzi un lock, invece, il crash del thread che detiene correntemente il lock porta all’impossibilità per tutti gli altri thread di acquisire successivamente il lock. (Vedi descheduling di un thread su Macchina Virtuale).
+
+#### Esempio
+
+In questo schema, supponiamo di avere in memoria condivisa un certo *val*. Quando lo leggo, e poi lo voglio usare per una `compare and swap`, il confronto lo faccio tra il valore in una certa locazione e quel *val*. Se sono uguali eseguo lo swap. Se qualcuno lo ha cambiato, ho un fallimento.
+
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-21-15-04-48-44.png)
+
+- **Insert**: supponendo di inserire il nodo $20$ tra i nodi $10$ e $30$ all’interno della lista collegata, si procede nel seguente modo: si ispeziona la lista fino al punto di aggiunta, si imposta $30$ come successore di $20$ e poi, tramite un’operazione di `Compare And Swap` (**CAS**, che è un’istruzione atomica. Sarebbe come il `compare and exchange`: o aggiorno io, o aggiorna un altro. Vince chi lo fa prima, il secondo farebbe un confronto errato. Se fallisco, ripeto!), si imposta $20$ come successore di $10$. 
+  
+  Con l’approccio **lock-free**, tale operazione non dà problemi; l’unico caso in cui si ha un fallimento (e quindi un abort) è quello in cui c’è un altro inserimento concorrente nello stesso punto della lista collegata. Ad esempio, se concorrentemente a $20$, un altro thread tenta di inserire un nodo $21$ tra i nodi $10$ e $30$, solo uno dei due inserimenti avrà successo, mentre l’altro fallirà; viceversa, se si hanno inserimenti concorrenti in posizioni differenti della lista, avranno tutti successo nonostante non ci siano lock / attese. 
+
+- **Remove**: supponiamo di voler rimuovere il nodo $10$ dalla lista collegata. Non possiamo farlo semplicemente deallocandolo ed eseguendo una `Compare And Swap` sul puntatore al successore del nodo testa (come nella figura in alto a sinistra). Infatti, può succedere che concorrentemente venga tentata l’esecuzione di un inserimento di un nodo $20$ proprio subito dopo il nodo $10$; se l’operazione di rimozione nel frattempo dealloca il nodo $10$, poi l’inserimento è impossibilitato a cambiare il puntatore al successore di $10$ perché si ritrova a lavorare su un *path* non più valido (vedere figura in alto a destra). Quello che si fa, dunque, è marcare il nodo $10$ come da eliminare, per poi deallocarlo effettivamente in un secondo momento (vedere figura in basso a sinistra). Di conseguenza, vengono utilizzati dei bit all’interno di ciascun nodo che indicano lo stato del nodo stesso; questo a discapito dei puntatori, che si ritroveranno quindi con meno bit a disposizione. Ne consegue che i puntatori non possono più essere utilizzati con la massima granularità. Dopo aver marcato il nodo come da eliminare, si può procedere con una `Compare And Swap` per correggere il puntatore del nodo precedente (come nella figura in basso a destra).
+
+**Attenzione**
+
+In tale contesto è molto pericoloso eliminare un determinato nodo per poi riutilizzarlo per inserirvi delle informazioni differenti. In breve: se un thread stava lavorando sul nodo 10, viene deallocato, e nel mentre il nodo 10 viene eliminato per far posto ad altro, quel thread, quando ritorna, avrebbe un indirizzo a qualcosa che non fa più parte della lista, come ad esempio aree sensibili! 
+Farebbe **traversing** (il thread si muove solo sulla lista, non conosce altro!).  
+In lungo: ad esempio, supponiamo che un thread A debba effettuare una lettura sul nodo n, e supponiamo che venga deschedulato subito dopo aver recuperato l’indirizzo di memoria di quel nodo ma prima di leggere il valore contenuto; supponiamo anche che un thread B deallochi proprio il nodo n e riutilizzi l’indirizzo di memoria di n per scrivere una nuova informazione da inserire nella lista collegata (o in una qualsiasi struttura dati). Allora, il thread A, quando verrà rischedulato, leggerà la nuova informazione anche se non era previsto dal flusso di esecuzione. Questo può anche rappresentare un problema di sicurezza nel momento in cui nei nodi sono riportati dei dati sensibili oppure, ad esempio, dei dati relativi agli utenti che stanno effettuando l’accesso a un determinato sistema.
