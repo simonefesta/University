@@ -32,7 +32,7 @@ L’architettura di calcolatore più semplice a cui siamo stati abituati a pensa
 
 - Un unico flusso di controllo (*fetch – execute – store*).
 
-- Transizioni nell’hardware time-separated: le istruzioni devono essere eseguite tutte una alla volta.
+- Transizioni nell'hardware time-separated: le istruzioni devono essere eseguite tutte una alla volta.
 
 - Stato della memoria ben definito all’inizio di ciascuna istruzione, la quale quindi deve poter vedere la memoria in uno stato coerente con l’esecuzione delle istruzioni precedenti.
 
@@ -1086,8 +1086,6 @@ Le operazioni RMW (Read-Modify-Write), nonostante implementino accessi in memori
 
 Sappiamo che con le operazioni RMW è possibile implementare un meccanismo di locking. I lock basati su RMW incentivano ancor più la linearizzazione, poiché portano le operazioni a essere eseguite in modo sequenziale.
 
-
-
 ![43.png](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/50b82687af4964513805ec4a7d0a751fe8a041b4.png)
 
 Ma, come dicevamo in precedenza, preferiamo delle tecniche alternative all’utilizzo dei lock per sincronizzare i thread mediante operazioni RMW. Analizziamole ora. Con *lock* si ha un approccio del tipo *blocco, lavoro, rilascio* come è già stato detto. Utile per operazioni in tempo reale su strutture condivise, ma poco scalabile. Poi, con *fence, le rendo effettivamente visibili.* Vediamo delle alternative:
@@ -1120,6 +1118,142 @@ In questo schema, supponiamo di avere in memoria condivisa un certo *val*. Quand
 
 **Attenzione**
 
-In tale contesto è molto pericoloso eliminare un determinato nodo per poi riutilizzarlo per inserirvi delle informazioni differenti. In breve: se un thread stava lavorando sul nodo 10, viene deallocato, e nel mentre il nodo 10 viene eliminato per far posto ad altro, quel thread, quando ritorna, avrebbe un indirizzo a qualcosa che non fa più parte della lista, come ad esempio aree sensibili! 
-Farebbe **traversing** (il thread si muove solo sulla lista, non conosce altro!).  
-In lungo: ad esempio, supponiamo che un thread A debba effettuare una lettura sul nodo n, e supponiamo che venga deschedulato subito dopo aver recuperato l’indirizzo di memoria di quel nodo ma prima di leggere il valore contenuto; supponiamo anche che un thread B deallochi proprio il nodo n e riutilizzi l’indirizzo di memoria di n per scrivere una nuova informazione da inserire nella lista collegata (o in una qualsiasi struttura dati). Allora, il thread A, quando verrà rischedulato, leggerà la nuova informazione anche se non era previsto dal flusso di esecuzione. Questo può anche rappresentare un problema di sicurezza nel momento in cui nei nodi sono riportati dei dati sensibili oppure, ad esempio, dei dati relativi agli utenti che stanno effettuando l’accesso a un determinato sistema.
+In tale contesto è molto pericoloso eliminare un determinato nodo per poi riutilizzarlo per inserirvi delle informazioni differenti.   
+*In breve*: se un thread stava lavorando sul nodo $10$, viene deallocato, e nel mentre il nodo $10$ viene eliminato per far posto ad altro, quel thread, quando ritorna, avrebbe un indirizzo a qualcosa che non fa più parte della lista, come ad esempio ar ee sensibili! 
+Il thread esegue **traversing**, si muove solo sulla lista, non conosce altro!.  
+*In lungo*: Supponiamo che un thread A debba effettuare una lettura sul nodo $n$, e supponiamo che venga deschedulato subito dopo aver recuperato l’indirizzo di memoria di quel nodo ma prima di leggere il valore contenuto; supponiamo anche che un thread B deallochi proprio il nodo $n$ e riutilizzi l’indirizzo di memoria di $n$ per scrivere una nuova informazione da inserire nella lista collegata (o in una qualsiasi struttura dati). Allora, il thread A, quando verrà rischedulato, leggerà la nuova informazione anche se non era previsto dal flusso di esecuzione. Questo può anche rappresentare un problema di sicurezza nel momento in cui nei nodi sono riportati dei dati sensibili oppure, ad esempio, dei dati relativi agli utenti che stanno effettuando l’accesso a un determinato sistema.
+
+### Sincronizzazione wait-free
+
+Qui non abbiamo né una logica di abort né una logica di retry: tutti i thread svolgono sempre lavoro utile, indipendentemente da quello che stanno facendo altri thread in concorrenza. Chiaramente si tratta di un approccio molto più “challenging” del precedente.  Come risolviamo il problema del non poter riusare quegli spazi di memoria nella linked list?
+
+Un esempio di struttura dati wait-free è il **registro atomico (1,N) wait-free**, che prevede un *solo scrittore* e $N$ lettori ed è un caso particolare del registro atomico (M,N) wait-free. È un registro arbitrariamente grande in cui le operazioni di scrittura e lettura devono essere effettuate in modo atomico e potrebbero richiedere un alto numero di cicli di clock per essere eseguite. In una situazione del genere non ci piace l’utilizzo dei lock, perché farebbe crollare vertiginosamente le prestazioni; piuttosto, si procede nel seguente modo: 
+
+- Si hanno molteplici istanze del registro atomico e un puntatore che referenzia l’istanza più aggiornata.
+
+- Lo scrittore, quando deve aggiornare il registro, ne alloca una nuova istanza; nel momento in cui ha terminato la scrittura, aggiorna con una `Compare And Swap` il puntatore per farlo referenziare verso la nuova istanza. 
+
+- I lettori sfruttano il puntatore per accedere all’area di memoria dov’è allocata l’istanza correntemente *più aggiornata* del registro atomico. Una volta che la lettura è iniziata, il lettore è sicuro che non ci saranno mai interferenze con l’istanza da parte di scrittori (per cui l’operazione andrà certamente a buon fine).
+
+Questa soluzione presenta però una difficoltà in particolare: non è banale stabilire quando è possibile effettuare la garbage collection delle varie istanze del registro atomico. Comunque sia, la letteratura stabilisce che servono almeno $N+2$ buffer (istanze) per far funzionare correttamente il meccanismo:
+
+- $N$ buffer sono (al limite) per gli $N$ lettori. 
+
+- $1$ buffer è adibito per contenere l’ultimo eventuale valore che non è stato ancora acceduto da alcun lettore.
+
+- L’ultimo buffer serve allo scrittore per inserire un eventuale nuovo valore. 
+
+Quindi sostanzialmente, ad ogni modifica creo un nuovo buffer, dico che quello è il più aggiornato, e chi lavora col vecchio lo usa finchè non ha terminato. Un limite da gestire è che non posso mantenere infiniti buffer, però qualcuno potrebbe puntarci ancora!
+
+Scendendo in qualche ulteriore dettaglio dell’implementazione di tale meccanismo, si ha un’unica variabile di sincronizzazione composta da due campi, $32$ per identifiare l’istanza e $32$ per il contatore: 
+
+- nel primo è indicato qual è lo slot (tra gli N+2 totali) che è stato aggiornato più recentemente dallo scrittore.
+
+- Nel secondo è riportato il numero di lettori che si sono attestati esattamente a quello slot; questo secondo campo viene aggiornato dai lettori mediante una chiamata a `fetch_and_add` **atomica**, un’istruzione che esegue la lettura, e l’incremento di una determinata variabile in modo atomico. Conto chi ha preso il riferimento sostanzialmente. Ovviamente le operazioni devono essere finite, sennò non posso contarle. Incremento solo se mi sposto tra aree di memoria, altrimenti non aumento se sto sempre sulla stessa.
+
+- Il reader decrementa il counter se ha finito di leggere.
+
+- Quando lo scrittore deve effettuare una scrittura, esegue una`atomic_exchange` sulla variabile di sincronizzazione, ovvero legge e mette da parte il contenuto attuale della variabile di sincronizzazione e riscrive tale variabile con: 
+
+- L’indirizzo di memoria del nuovo buffer (nel primo campo).
+
+- Il valore 0 per indicare che inizialmente non ci sono lettori che hanno acceduto al nuovo buffer (nel secondo campo). 
+
+Chiaramente ciascun lettore dovrà essere in grado di visualizzare sempre la versione della variabile di sincronizzazione associata allo slot in cui l’operazione di lettura era iniziata. Nel momento in cui in uno slot non ci sono più letture pendenti (per cui *#letture iniziate $=$ #letture terminate*), tale slot può essere sfruttato dallo scrittore per inserirvi dei nuovi dati aggiornati; tra l’altro, con $N+2$ slot totali, esiste sempre almeno uno slot che soddisfa questa proprietà, per cui lo scrittore non rimarrà mai bloccato per eseguire le scritture.
+
+Esistono anche delle *ottimizzazioni* del protocollo: ad esempio, è possibile fare in modo che ciascun lettore esegua un’unica `fetch_and_add` sul contatore dei lettori per ogni diversa istanza di registro che va a leggere. In tal modo, si riduce il numero totale di operazioni atomiche eseguite e questo è un beneficio anche per la *cache coherency*: sappiamo che le istruzioni atomiche di tipo RMW portano un particolare CPU-core a prendere un blocco di cache nello stato exclusive, lasciando così gli altri CPU-core bloccati nel caso in cui vogliono accedere al medesimo blocco di cache.
+
+## Read Copy Update RCU
+
+È un tipo di sincronizzazione che fa da trade-off tra l’utilizzo dei lock e la lock-freedom. Infatti, non offre le stesse garanzie della lock-freedom (in cui tutte le istanze di chiamate a funzione terminano in tempo finito) ma, di contro, semplifica il meccanismo di garbage collection; questo rende RCU più scalabile. Qui possiamo ammettere, su una struttura dati concorrente, *un solo writer* e $n$ di reader per volta: 
+
+- I reader, per eseguire le *letture*, non devono attendersi né a vicenda né col writer.
+
+- Il writer, per eseguire una *scrittura*, deve attendere solo eventuali altri writer.
+
+Si tratta dunque di un approccio vincente per le strutture dati **read-intensive**, che nella pratica sono tantissime; infatti, Linux implementa RCU per molte strutture dati usate a livello kernel. (Ad esempio, la lettura di una *hash table* per vedere il thread control block (*TCB*) di un thread!)
+
+RCU prevede che un buffer o un nodo di una struttura dati non può essere deallocato finché non siamo sicuri che sia diventato inutilizzato. In particolare, tra l’istante in cui viene invocata la deallocazione (e il buffer/nodo viene marcato come “da deallocare”) e l’istante in cui il buffer/nodo viene effettivamente deallocato, si ha il cosiddetto **grace** **period**.
+
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-22-14-33-45-45.png)
+
+Nella figura qui sopra si hanno tre *reader* (escludiamo quello che conclude prima di *grade period*) che eseguono una lettura concorrente alla removal e che quindi devono essere attesi prima della rimozione vera e propria (*reclamation*): il grace period dura fin tanto che tutti e tre questi reader non hanno concluso la loro lettura. Il Grace period è un periodo di grazia in cui, anche se sono pronto a cambiare indirizzo, lascio “attivo” il vecchio indirizzo per far concludere le letture. In particolare, è necessario attendere tutti e tre i reader indistintamente perché lo scrittore non sa qual è l’istante esatto in cui avviene la linearizzazione della removal, per cui deve assumere che tutte le letture concorrenti siano iniziate antecedentemente a tale istante. Non posso modificare *removal* finchè qualcuno la usa. Quindi, se reader concorrenti e su *cpu diverse*, non vedono che un “pezzo” è stato sganciato, allora devo aspettarli. Questo perchè chi linearizza prima di me, non potrebbe rientrare se togliessi la struttura.
+
+### Funzionamento
+
+#### Il lettore
+
+1) Segnala la sua presenza. 
+
+2) Legge la struttura dati.
+
+3) Segnala che se ne sta andando.
+
+#### Lo scrittore
+
+1) Acquisisce il lock di scrittura.
+
+2) Aggiorna la struttura dati.
+
+3) Attende che i lettori “*standing*” terminino le loro operazioni; notiamo che i lettori che operano sull’istanza della struttura dati già modificata sono dei *don’t care reader*.
+
+4) Dealloca la vecchia istanza della struttura dati.
+
+5) Rilascia il lock di scrittura.
+
+## Non-preemptable RCU vs preemptable RCU
+
+A questo punto è necessario risolvere il seguente problema: come fa lo scrittore a distinguere un lettore standing da un lettore che opera sull’istanza della struttura dati già modificata? Di seguito vengono proposte due possibili soluzioni.
+
+- **Non-preemptable RCU**: qui è necessario che i reader disattivino la possibilità di essere interrotti (“prelazionati” dalla CPU, cioè thread su cpu non interrompibili, non rilasciano la cpu su richiesta) durante la loro esecuzione. In tal caso, lo scrittore, subito dopo aver aggiornato la struttura dati, invoca: `for_each_online_cpu(cpu)`,  `run_on(cpu)`. In pratica, lo scrittore si fa un giro su tutte le CPU della macchina e ne richiede l’utilizzo. Appena riesce a essere schedulato sulla CPU$_i$, significa che sulla CPU$_i$ non è più in esecuzione (o non lo è mai stato) un lettore che era standing al completamento dell’aggiornamento. Di conseguenza, quando lo scrittore verrà schedulato su tutte quante le CPU, sarà possibile concludere il grace period senza problemi. Il grosso svantaggio di questo approccio sta nell’impossibilità di interrompere l’esecuzione dei lettori: se a un certo punto dovesse subentrare un thread con priorità arbitrariamente elevata, dovrà in ogni caso aspettare che un qualche lettore termini prima di essere schedulato.
+
+- **Preemptable** **RCU**: Qui potrei subire un *interrupt*, ma stando al “ragionamento” di prima, lasciare la CPU vuol dire aver finito. Si usa il concetto di **epoca**:   
+  Si ricorre all’utilizzo di un **presence-counter atomico** che va a indicare quanti lettori stanno correntemente insistendo su una determinata versione (**epoca**) della struttura dati; è atomico perché, come al solito, vengono acceduti in lettura e in scrittura con un’unica istruzione atomica (i.e. `fetch_and_add`). Nel momento in cui lo scrittore aggiorna la struttura dati, redireziona il puntatore al presence-counter verso una nuova istanza di presence-counter (*quello relativo alla nuova epoca*), in modo tale che i lettori successivi aggiornino quest’ultimo; d’altra parte, i lettori standing, quando completano le loro operazioni, **decrementano** il presence-counter della vecchia epoca (last-epoch), in modo tale che sia tutto consistente. Chiaramente, il grace period termina quando il last-epoch counter diviene uguale a zero. Nella pagina seguente è riportato uno schema riassuntivo sul funzionamento del preemptable RCU.
+
+![](/home/festinho/University/SOA/md/img/46.png)
+
+## Vettorizzazione
+
+È un meccanismo in cui le singole istruzioni hanno un vettore di sorgenti e un vettore di destinazioni; in altre parole, vengono coinvolti molteplici registri contemporaneamente. Di conseguenza, si ha un miglioramento delle performance. La vettorizzazione è una forma di **SIMD** (**Single** **Instruction** **Multiple Data**) alla base delle GPU; in alternativa al SIMD esistono:
+
+- **MIMD** (**Multiple** **Instruction** **Multiple Data**): è la forma di calcolo realmente utilizzata nelle macchine reali; rispetto al SIMD prevede l’utilizzo di molteplici processori/core. Chip con hyperthread, ad esempio un hyperthread (MI) e speculazione (MD). 
+
+- **MISD** (**Multiple** **Instruction** **Single** **Data**): è una forma di calcolo più rara, anche se qualcuno sostiene che un processore speculativo sia MISD; di fatto, i processori speculativi introducono la possibilità di eseguire più istruzioni in parallelo su uno stesso dato, sfruttando anche molteplici istanze del medesimo registro logico.  
+  *Nb*: i renamed register non sono esposti in ISA. 
+
+- **SISD** (**Single** **Instruction** **Single** **Data**): è la forma di calcolo più banale, dove è previsto un unico CPU-core non speculativo. Sarebbe l’architettura di Von Neumann.
+
+Per poter implementare la vettorizzazione, la macchina chiaramente deve fornire appositi registri, apposite istruzioni macchina e appositi meccanismi dell’hardware, come ad esempio:
+
+- L’**hardware data** **gather**, per raccolta di dati dalla memoria verso un registro vettoriale.
+
+- L’**hardware data** **scatter**, per il riversamento di dati dal registro vettoriale verso la memoria. 
+
+Tramite flag `-O` posso implementare calcoli vettoriali senza API, esistono anche `–O2` o `–O3`, più cresce più ottimizza, ma deve essere opportunamente gestito, cioè sezioni critiche vanno regolate con `mfence` per evitare problemi ad accessi in memoria. Alcune ottimizzazioni abilitabili sono il *vectorize* e *loop-unrolling*. Il *volatile* è invece una non-ottimizzazione, che però può essere utile per cose più delicate.
+
+In x86, la vettorizzazione è detta **SSE** (**Streaming SIM Extension**), mentre in x86-64 è detta **SSE2**.   
+In SSE si hanno 8 registri vettoriali a 128 bit, che sono $XMM0$, $XMM1$,…, $XMM7$. Tali registri sono in grado di ospitare:
+
+![](/home/festinho/.var/app/com.github.marktext.marktext/config/marktext/images/2023-11-22-14-58-10-47.png)
+
+In SSE2, invece, si hanno 16 registri vettoriali a 128 bit, che sono $YMM0$, $YMM1$,…, $YMM15$.
+
+Le istruzioni di `mov` che coinvolgono i registri *XMM* e *YMM* (caricamento di dati nei registri vettorizzati / store dei dati dai registri vettorizzati in memoria) potrebbero richiedere che le informazioni siano allineate in memoria (e.g. agli 8 byte, ai 16 byte). L’utilizzo delle istruzioni che richiedono l’allineamento sui dati non allineati causa un **general** **protection** **error**.   
+Esistono più modi per allineare le informazioni in memoria: 
+
+- ` __attribute__ ((aligned (16)))` 
+
+- `mmap()`, che alloca delle pagine di memoria allineate ai 4 KB.
+
+### Vettorizzazione esplicita ed implicita
+
+- **Vettorizzazione esplicita**: il programmatore utilizza esplicitamente le istruzioni che coinvolgono i registri vettorizzati. 
+- **Vettorizzazione implicita**: il programma viene compilato col flag `-O` in modo tale che il compilatore `gcc` scandisca il codice sorgente e lo mappi, ove possibile, su istruzioni vettoriali.
+
+Per quanto riguarda la vettorizzazione esplicita, in realtà in C sono offerti degli instrinsics (delle funzioni ad hoc) per sfruttare la vettorizzazione:
+
+![](/home/festinho/University/SOA/md/img/48.png)
+
+# 
+
+# Kernel Programming Basics

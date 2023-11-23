@@ -20,6 +20,13 @@ Cache impattata quando creo struct ad esempio. Devo applicare politica *Loosely 
  Si. Se la macchina è 2core/4thread (vedi slide *Baseline OOO, con due motori sotto)*, posso, tramite *0x5 ./a.out*, usare due hyperthread su stesso core (5 = 0101, uso lo 0-esimo e il secondo). Perchè lavora meglio? Perchè stanno **lavorando su stessa replica**, e non devono cambiare stato .  
  (MESI è tra cache “diverse”, non nella singola). Essi accedono alla stessa memoria cache L1 e L2 del core e condividono la stessa copia dei dati. Senza *affinità*, i thread vengono mossi tra core diversi.
 
+### API kernel Level
+
+ - Il writer usa *synchronize_rcu()* per aspettare la fine del grace moment e “sganciare” l’area di memoria.  
+ - Con *call_rcu()* non è il writer che aspetta, ma un demone di sistema.  
+ - Con *rcu_read_lock()* e *rcu_read_**unlock()* segnalo che il lettore sta iniziando la sua attività, e poi la sua conclusione. Sono inutili in un contesto *non preemptive*.  
+ Oltretutto, devo tener traccia di ciò che faccio, e quindi uno un *puntatore a struct srcu_struct* inizializzata tramite *INIT*, che poi dealloco con *CLEANUP.* Kernel Linux basato su queste API*:  segnalo che non voglio abbandonare la cpu durante la lettura.* La lettura è non-preemtable, cioè in questo caso **non** lascio la cpu. Se nel mentre, ci fosse un servizio bloccante? Dovrei lasciarla io, ma questo potrebbe far pensare che ho finito di leggere. Quindi va bene solo con *servizi non bloccanti*. Esistono comunque API per gestire il caso di servizi bloccanti. ***RCU user level con thread preemptable a user-level!*** Uso istruzioni atomiche con Presence counter. Reader entra con +1, legge, e fa -1. Non basta un counter solo, perchè posso avere concorrenza rispetto al suo update, quindi chi viene dopo punta ad altro, chi viene prima no. Sostanzialmente dovrei mantenere due counter, attivo il nuovo e aspetto sul precedente, e rendo disponibile un nuovo *update* solo quando il precedente counter è libero, altrimenti potrei crearne troppi.
+
 ## Locked List.c
 
 Abbiamo due tipi di utilizzo:
@@ -454,3 +461,23 @@ Ho un thread, che chiama `sys_read()` (siamo scesi nel kernel) e poi `return pro
 
 La variabile per-cpu non è all'indirizzo temp, ma in un altro indirizzo. Sto corrompendo la variabile per-cpu di un'altra cpu. Ciò avviene se i servizi vanno in pree-emption oppure vanno in blocco, posso essere rimesso su altra cpu. Soluzione? Devo aggiungere altro!
 Soluzione parziale: affinità, ma poi lo forzo a lavorare solo lì!
+
+
+
+## 23 novembre
+
+## Servizio usleep()
+
+Possiamo dormire a grana fine, ovviamente esiste già, però sappiamo che se chiediamo di dormire $x$ millisecondi, il kernel ci fa dormire $x+\Delta$ millisecondi.
+La sys call `sys_goto_sleep(unsigned long microsecs)` ci fa dormire per un tempo pari al parametro. Possiamo creare `wait_queue` locale, cioè nella stack area dell'oggetto. Ha senso se la usiamo solo noi qui dentro, relazionabili a questo thread. Così non chiamiamo nè allocatore nè altro.
+Quando il timer scorre, usciamo. Altrimenti, settiamo `control = &data`, variabile locale associata a `control_record`, una struct contenente `struct task_struct *task` in cui scriviamo il nostro TCB, nel pid il pid e un `awake`, per il risveglio. Abbiamo anche `struct htimer hr_timer`.
+Tutto questo è puntato da `control_record`, allora riempio le informazioni (esempio: `control ->stack = current`) . Poi inizializzo `hr_timer` per inizializzare timer e farci risvegliare.
+In origine, mettiamo NO nell'awake, e poi chiediamo di metterci nella coda di attesa con una `control->awake=YES` e un certo intervallo. Perchè viene messo a dormire più del dovuto se non è un thread real time?
+Perchè non è così importante non essendo real-time? NO.
+Se è a bassa priorità, viene messo nella coda e non verrà selezionato in favore di altri, quindi perchè svegliarlo poco più tardi?
+Quando ci risvegliamo, mettiamo TCB su runqueue, ma è ciò che avviene davvero? chi lo fa?  Noi giriamo top_half dell'hr_timer, marca la software queue_deamon  che mette sulla runqueu il demone ad alta priorità, quindi dobbiamo togliere altre cose dalla cpu. Allora, tanto vale farlo per attività sensibili. Thread di bassa priorità posso interferire su quelli ad alta priorità, quindi se il thread non è real-time dorme di più. Il demone non cambia priorità.
+Con la nostra versione, ciò non avviene, inizializziamo struttura di controllo e timer, che lavora col nostro intervallo, saltando le regole del kernel.
+Alla fine, la tabella inserita in hr_timer la cancello con `cancel`.
+Perchè posso uscire o se il demone mette condizione a yes, o se lo ha fatto qualcun altro. Se così non faccio, demone riferisce stack area in cui non ha più senso controllare informazioni. Bisogna ragionare in termine di ecosistema, non solo quello che vediamo noi.
+
+Quando arriva interrupt, parte il demone che processa la funzione da noi definita, con `container_of` prendo tabella esterna, contenente info thread, tcb, condizioni etc... qui settiamo `awake=YES` etc. All'uscita, il software che lo ha chiamato non la reinserirà. Li dentro uso stack area di qualcuno, quel qualcuno deve esistere. Se montiamo ed avviamo con `./a.out [numero millisecondi]`, vediamo che con un numero ridotto di millisecondi c'è una differenza tra *usleep classica* e la *nostra implementazione*. Se disattivo macro, userò due volte le stesse cose, con stessi risultati.
