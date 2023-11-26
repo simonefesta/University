@@ -103,6 +103,12 @@ successivamente eseguo "aligned" perchè devo fare op. atomiche e mi allineo con
 
 - REMOVE: Quando concludo, sono al tempo 't', quindi i nuovi 'reader' non possono agganciarsi al vecchio elemento, tuttavia quelli vecchi potrebbero ancora essere collegati!
 
+## Digressione sul file segments.c
+
+ In un registro carico ptr/offset. Se eseguo una run con registro *DS* e offset fisso, e successivamente cambio *DS con* *SS*, NON ho alcuna variazione nei risultati, cioè questi due segmenti vengono visti come coincidenti in memoria, come se fossero uno sopra l’altro. Se provassi con *FS?* Avrei *segmentation fault*, in quanto *non* è presente nel mio address space, cioè non ho info valide nell’entry di FS. Perchè?  
+ I registri *CS,...,ES* **devono** stare nell’AS, poi se coincidono a Linux interessa poco, in quanto usa poco la segmentazione.  *FS* sono registri usati per *Thread Local Storage*, quindi due thread su due CPU possono toccare due *TLS* posizioni in due *FS* diversi. Non c’è sovrapposizione. FS, nel programma, non è configurato nel contesto di esecuzione. *Curiosità:* Un thread, può cambiare info nel registro FS mediante syscall, quindi chiamando il kernel per fare l’update del contesto, ma questo può essere usato in modo malevolo, il thread potrebbe fornire una zona non sua!.  
+ Inoltre potrei identificare una zona Kernel con il registro *GS*, che è per-CPU-memory, senza usare *cpu-id*, ma limitandomi ad accedere a tale registro.
+
 ## Lezione 26/10/23
 
 Un modulo di linux è un kernel object, "ko", è un oggetto, non è un eseguibile, è reso eseguibile dal kernel (in particolare thread lato kernel).
@@ -461,8 +467,6 @@ Ho un thread, che chiama `sys_read()` (siamo scesi nel kernel) e poi `return pro
 
 La variabile per-cpu non è all'indirizzo temp, ma in un altro indirizzo. Sto corrompendo la variabile per-cpu di un'altra cpu. Ciò avviene se i servizi vanno in pree-emption oppure vanno in blocco, posso essere rimesso su altra cpu. Soluzione? Devo aggiungere altro!
 Soluzione parziale: affinità, ma poi lo forzo a lavorare solo lì!
-
-
 
 ## 23 novembre
 
