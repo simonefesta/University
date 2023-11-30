@@ -485,3 +485,84 @@ Alla fine, la tabella inserita in hr_timer la cancello con `cancel`.
 Perchè posso uscire o se il demone mette condizione a yes, o se lo ha fatto qualcun altro. Se così non faccio, demone riferisce stack area in cui non ha più senso controllare informazioni. Bisogna ragionare in termine di ecosistema, non solo quello che vediamo noi.
 
 Quando arriva interrupt, parte il demone che processa la funzione da noi definita, con `container_of` prendo tabella esterna, contenente info thread, tcb, condizioni etc... qui settiamo `awake=YES` etc. All'uscita, il software che lo ha chiamato non la reinserirà. Li dentro uso stack area di qualcuno, quel qualcuno deve esistere. Se montiamo ed avviamo con `./a.out [numero millisecondi]`, vediamo che con un numero ridotto di millisecondi c'è una differenza tra *usleep classica* e la *nostra implementazione*. Se disattivo macro, userò due volte le stesse cose, con stessi risultati.
+
+## 29 novembre 2023
+
+### KERNEL LEVEL TASK MANAGEMENT
+
+#### WINDOW MANAGER CHECKER
+
+Implementa syscall che permette di consultare informazioni sullo stato corrente delle `vmareas`. Installiamo syscall che prende in input indirizzo virtuale (dove vogliamo osservare informazioni, quali elementi osservare )e un command (cosa osservare). Ad esempio, se posso eseguire read, write o exec.
+
+Quando lavoriamo su tcb corrente, e su tabella `mm`, possiamo arrivare alle informazioni. Prendiamo `map` mappa di memoria, e scandiamo la lista elemento per elemento, e vediamo se ci troviamo nell'intervallo di indirizzi espressi, abbiamo tre modalità, dopo aver estratto maschera dei bit.
+
+- mode == 0, memoria si può leggere, ritorna 1, è sempre leggibile, su x86 non esiste supporto hardware per generare fault quando memoria è mmappata, anche se la *proteggo*.
+
+- mode ==1, applico maschera per vedere se posso scrivere e ritorno 1 se ciò è vero.
+
+- mode ==2, applico maschera per vedere se posso eseguire exec, e ritorno 1 se vero.
+
+abbiamo anche `-EINVAL` se cadiamo fuori dagli indirizzi.
+
+Montiamo con `sudo make mount`,  poi passiamo a `test.c`:
+Prendiamo, in base ad `argv[1]`, i flag per verificare lo stato.
+
+#### NAMESPACES
+
+Nel main di `new-namespace.c` chiamiamo il clone, passando la funzione child, passando come parametri l'area che ho deciso di usare come stack area, e facendo `CLONE_NEWPID`. La funzione chiamata esegue `printf` del PID child, ed una exec di una shell bash.
+
+Il parent stampa cosa è successo sulla clone, indicando child pid, e poi attende la terminazione del figlio. Il thread originale si sveglia quando il namespace del figlio sparisce.
+Si lancia con `./new-namespace`, all'inizio si ha errore, perchè la clone fa matching tra parametri passati e id utente chiamante. Il thread chiamante il servizio deve operare come fosse `root`. Con sudo worka.
+Il PID è 1, perchè istanza nuova di servizio, e il primo thread lanciato avrà valore $1$. L'id ritornato al padre viene invece visto nel namespace originale, di valore $16685$. Se lancio comando `ps -elf`, lui usa pseudo file non syscall, allora ciò che vedono è indifferente rispetto ai namespace, per questo vede tutto. Se facciamo `kill -9 16685` sul nuovo namespace, ovviamente non funziona, perchè nel nuovo namespace non esiste questo pid. Qui dentro abbiamo sicuramente pid 1.
+
+## 30 novembre 2023
+
+### Homework Blocking Queueing Service
+
+La gestione è FIFO, eccetto il risveglio da segnale.
+
+Devo conoscere il TCB del thread che voglio risvegliare, in particolare mi serve l'indirizzo. Quando un thread va a dormire, mettiamo in una lista i riferimenti ai nostri TCB. Per risvegliare, cerco nella lista e richiamo il risveglio. La lista prevede buffer collegati, devo allocarli esplicitamente?
+No, perchè questi buffer possono risiedere sulla stack area dei vari thread che vanno a dormire. Quindi thread ha nella sua stack area, una variabile locale che va a puntare al thread control block. Ciò va bene con strutture dati piccole. Mettersi sulla lista lo si fa con una syscall, in cui sfruttiamo la variabile locale per puntare al TCB, oltre che una variabile per la condizione del nostro risveglio (es: variabile posta a 0).
+Altre attività sono inserimenti e cancellazioni nella coda, nella soluzione il thread che risveglia qualcuno non si occupa della cancellazione, ma lo fa il thread che si sta eliminando, da solo.
+
+#### sleep-awake-queue
+
+Qui installiamo le syscall lavoranti su `struct_elem`, contenente puntare a task struct, pid, awake (la condizione), e collegamenti al predecessore e succesore. C'è una testa ed una coda, che sono solo di riferimento, noi lavoriamo tra di loro.
+
+Nella `sys_goto_sleep` inizializziamo i campi, `me.awake = NO` e `me.already_hit = NO` (un thread chiama sleep, può essere risvegliato da $n$ chiamate `awake`, quindi $n$ thread che dormono, $n$ awake, $1$ chiamata. Se `YES` allora è già stato colpito da un risveglio, è didatticamente più chiaro rispetto all'usare solo `awake`).
+
+Quando andiamo sulla coda, usiamo spinlock, prendiamo in `aux` la tail, e facciamo controllo sulla struttura. Se tutto ok, ci mettiamo in coda, con il nostro record `me`, aggiustando poi i puntatori. Poi facciamo una unlock dello spinlock, e un `atomic_inc`.
+Quando siamo colpiti da segnali, `wait_event_interruptible` mettiamo `awake=YES`, e quando accade prendiamo spinlock, ci stacchiamo dalla lista, e rilasciamo spinlock. 
+Con il check di `me.awake==NO` capiamo se siamo stati risvegliati esternamente.
+
+Con `preempl_disable()`, indichiamo che il thread non vuole lasciare la cpu.
+Ma sotto abbiamo spinlock, che ingloba questo comando:
+
+- mette thread nonpreemptable
+
+- prende lock
+
+E' un **counter**, quindi facendolo due volte non è che si riattiva.
+Andando avanti abbiamo `preempl_enable()`, ed è ridondante, perchè abbiamo spinlock e perchè dopo ci mettiamo in attesa di interruzioni.
+
+Abbiamo anche `while(aux->next != &tail)`, tramite `aux`, e cerchiamo gli `already_hit == NO`, che setterò come risvegliati.
+Alla fine ritorniamo process id del processo che non era already_hit e che dovevo svegliare, ovvero di cui ho cambiato le condizioni di risveglio su questa coda.
+Abbiamo `sudo make mount`, che monta su $134$ e $137$.
+Poi `xTerminal &` in bg, perchè c'è user e server.
+Il client lancia i thread stabiliti, mediante `sleep_or_awake`, che prende un parametro $x$. Avviamo user con`gcc user.c -lpthread`, poi `./a.out 10 134`
+
+RImuoviamo il modolo con `sudo rrmod the_queuing_service`.
+
+NB: testa e coda non sono nello stack, perchè devono usarli tutti. Sono nella zona memoria accessibile globalmente, non stack area.
+
+`schedule()`  eseguibile su cpu diverse, normalmente va a lavorare su una coda per-cpu. 
+Se sistema ha due CPU$_0$, un thread può eseguire schedule in $t$, e completare i $t_2$ , mentre un altro schedule può avvere su CPU$_1$
+
+#### Virtual PIDS
+
+Il servizio mette a disposizione una syscall che prende pid, o spazio originale o virtuale, tramite `sys_get_pid_service(unsigned long type)`.
+In base alla versione kernel facciamo differenziazione.
+Nelle versioni vecchie l'oggetto `last_pid` esiste sempre, per default settato a valore di pid nel namespace originale.
+Nelle versioni recenti ciò non è vero, e devo usare `__task_pid_nr_ns`, usata sempre nei servizi veri. Altrimenti prendiamo `current->pid`.
+
+Montiamo il modulo e lanciamo `user.c` con `./a.out`, che ritorna il pid nel namespace in cui ci troviamo. Con `sudo ../../namespaces/new-namespace`, cambiano namespace per la shell. Rilanciamo `./a.out` vediamo sia pid nel namespace corrente, sia quello *ancestor*.
