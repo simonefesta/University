@@ -1722,7 +1722,6 @@ Il dispatcher di default è **interrompibile**. Per proteggersi da eventuali int
 
 Ciò potrebbe non essere sufficiente per l’atomicità dell’esecuzione del dispatcher: nelle architetture multiprocessore, si è soggetti a un accesso concorrente ai dati. Per ovviare a questo problema, si può ricorrere alle soluzioni classiche di **spinlock** o **Compare And Swap**.
 
-
 ### Componenti sw per la gestione delle system call
 
 - Lato **user**: Si ha un modulo software che fornisce i parametri di input al GATE (e, quindi, al dispatcher), attivi il GATE e recuperi il valore di ritorno della system call. Il gate è `INT 0x80`, gli altri gate sono in IDT e si usano per runtime errors e interrupt. Quindi c’è una trap (appartenente alla IDT) che permette all’utente di usare il dispatcher. Il suo handler è interrompibile (ma abbiamo visto prima come settarlo).  
@@ -1775,7 +1774,6 @@ Vediamo un esempio di invocazione a una system call che non accetta parametri in
   Tale valore deve essere posizionato all’interno del registro `eax`/`rax` affinché lo stato del processore sia coerente rispetto a quello che il dispatcher si aspetta. `name` viene usato per richiamare il simbolo `__NR_##name`, e prenderne il codice numerico. 
 - In `"=a" (__res)` si impone che il valore di `eax`/`rax`, a seguito dell’invocazione dell’istruzione `int $0x80`, venga registrato all’interno della variabile `__res`.  In pratica, in `__res` viene inserito il valore di ritorno della system call. 
 - L’ultima riga del blocco di codice, infine, prevede che il valore di `__res` venga processato in qualche modo dalla funzione associata alla macro `__syscall_return(type, __res)`.
-  
 
 Approfondiamo quest'ultima riga:
 
@@ -1850,8 +1848,6 @@ Tale organizzazione dello stack è **details**, in modo tale che il dispatcher s
 
 Lo stack alignment 32 che abbiamo appena descritto è definito all’interno di una struct chiamata **pt_regs**, che specifica appunto l’ordine con cui devono essere collocate sullo stack le informazioni rappresentative per lo snapshot di CPU. Tra l’altro, il kernel ha la possibilità di accedere alle informazioni relative allo snapshot semplicemente tramite un puntatore a una struttura di tipo `pt_regs`.
 
-
-
 ### Convenzione di UNISTD_32 per l'invocazione delle system call
 
 ![](img/2023-11-28-00-37-37-image.png)
@@ -1879,7 +1875,6 @@ Come abbiamo anche accennato in precedenza, una volta ottenuto il controllo, il 
 
 **NB:** Nello standard `UNISTD_32`, anche quando vengono invocate system call con $0$ parametri, viene comunque salvato sullo stack l’intero snapshot dei registri di CPU. Ciò implica che il **kernel è in grado di visualizzare anche le informazioni che non gli competono**, il che rappresenta un’importante problematica per la sicurezza. Il sottosistema kernel prende i parametri sempre nello stesso modo, non posso decidere arbitrariamente di prenderli una volta dallo stack, e poi da altre parte. Dalla versione $4.17$ del kernel, **una entry della system call table non punta più direttamente al codice della system call**, bensì punta ad un **wrapper**, che sarà colui che la chiamerà effettivamente, passando anche i parametri dallo stack.  
 Il wrapper si trova nel kernel, e svolge anche il ruolo di *allineatore di parametri*, ovvero adegua la taglia, poichè, causa retrocompatibilità, potrei avere un *elf 32 bit* e un *kernel 64 bit*, e lui ha il compito di risolvere queste incompatibilità. Inoltre, maschera dallo stack i valori non utilizzati, risolvendo il problema di sicurezza precedentemente esposto.
-
 
 ![](img/2023-11-28-00-37-04-image.png)
 
@@ -1918,8 +1913,6 @@ int main(int a, char** b){
 ## Implicazioni dell'uso di int 0x80
 
 Questa istruzione di `trap` porta in primo luogo a effettuare un accesso alla IDT (sulla porta `0x80`) per accedere all’unico GATE che permette il passaggio dal livello di protezione 3 al livello di protezione 0 on-demand. Il passaggio per tale GATE comporta poi la necessità di accedere a un *segmento differente* dell’address space, per cui bisogna ricorrere alla GDT per recuperarlo. Non solo: tipicamente serve anche un secondo accesso alla GDT per reperire il *segmento TSS relativo al thread corrente*, perché è qui che si trovano le informazioni utili per recuperare lo stack di livello **kernel**. (infatti nel TSS mantengo l’indirizzo stack sia a livello $0$ sia a livello $3$). Quando creo un thread, automaticamente alloco stack. In generale, per gli accessi in memoria conseguenti all’istruzione `int 0x80`, possono trascorrere numerosi cicli di clock, e la loro varianza può essere molto elevata nel momento in cui abbiamo a che fare con hardware asimmetrici (vedi l’architettura **NUMA**). Questo è inaccettabile quando abbiamo a che fare con system call che richiedono un’alta precisione con il tempo, come `gettimeofday()`, che ha il compito di leggere il registro di CPU `rdtsc` per restituire il valore corrente del tempo.  Infatti, in queste condizioni, tale system call fornisce un risultato inaffidabile.
-
-
 
 ## Fast system call path
 
@@ -2068,3 +2061,602 @@ asmlinkage long sys_ni_syscall (void) { 
 ```
 
 Ciò dipende dallo standard **ABI** adoperato, che definisce quali sono le istruzioni in linguaggio macchina da usare per fare le chiamate (system call) al kernel, il modo in cui devono essere passati i parametri per tali chiamate e come ottenere i valori di ritorno. Con ***asmlinkage*** il dispatcher effettua l’allineamento, ovvero genera codice che sa dove trovare i suoi parametri. (in realtà bisognerebbe citare anche la presenza del wrapper, qui per semplicità ancora non viene introdotto).
+
+### Dispatcher con INT0x80, kernel 2.4, UNISTD32
+
+![](img/2023-12-01-16-13-14-image.png)
+
+- L’istruzione `cmpl $(NR_syscalls), %eax` si occupa di confrontare il valore del registro *eax* (che contiene il codice numerico della system call che si vuole invocare) con *NR_syscalls*, che è il numero totale di system call che il dispatcher può gestire (comprese le varie *sys_ni_syscall*); in altre parole, controlla se eax cade all’interno dell’indirizzamento delle system call supportate dal kernel. Se la risposta è no, allora viene eseguita una jump verso una zona del codice etichettata con badsys. 
+
+- Nel caso in cui il registro *eax* contenga un valore lecito, viene invocata la system call che, all’interno della system call table, si trova a spiazzamento `eax*4`, proprio perché ogni entry è di 4 byte. 
+
+- restiamo molta attenzione alla porzione di codice evidenziata in giallo: qui si ha la possibilità di passare come parametro al dispatcher un indice numerico arbitrariamente grande (che eccede le dimensioni della system call table) e, attraverso un branch mis-prediction, anche se in maniera speculativa, di andare a invocare una call a un indirizzo di memoria che va oltre la system call table. Questo può lasciare degli effetti micro-architetturali importanti all’interno della macchina. Per ovviare a tale inconveniente, nelle versioni successive del kernel si è ricorsi alla tecnica della **sanitizzazione**.
+
+### Dispatcher con SYSCALL, kernel 2.4, UNISTD64
+
+![](img/2023-12-01-16-13-39-image.png)
+
+Ricordiamo che qui non ci sono gate, c'è altro, ma si usa sempre il dispatcher.
+
+- La seconda e la terza istruzione (le `mov`) si occupano di eseguire lo switch dello stack dato che, come sappiamo, contestualmente al fast system call path, non viene effettuato alcun cambio automatico dello stack. (Qui ci serve, ma visto che la fast system call non lo fa in automatico, lo “forziamo” noi).
+
+- L’istruzione `swapgs` porta ad aggiornare il registro di segmento GS. Swapgs switcha due registri MSR, uno contenente la GS area corrente e l’altro la GS area alternativa. Si lavora sempre col *current*. All’inizio parto da user, poi con swapgs passo a kernel. Questo è importante perché, quando si entra in *modalità kernel*, si inizia ad avere a che fare anche con la *per-CPU memory*, il che richiede di avere ***GS*** *settato* in modo tale da portarci in un’area di memoria **contenente le informazioni relative alla CPU su cui il thread corrente** sta girando, oltre a dove è posta **la stack area a livello sistema.** 
+
+- La zona di codice evidenziata in giallo è del tutto analoga a quella del caso precedente e, in particolare, senza sanitizzazione è vulnerabile agli attacchi basati sul mis-prediction per i salti condizionali.
+
+### Implementazione del dispatcher in kernel 4
+
+![](img/2023-12-01-16-20-05-image.png)
+
+- Questo modulo, a differenza dei precedenti, non va a invocare direttamente il front-end che implementa il servizio richiesto, bensì un oggetto intermedio (uno **stub** o **dispatcher secondo livello**), che poi a sua volta passerà il controllo alla system call effettiva. Tale stub (che è mostrato qui di seguito) serve ad innalzare il livello di sicurezza.
+
+![](img/2023-12-01-16-20-52-image.png)
+
+- Al codice che identifica la system call viene applicata una maschera di bit che fa sì che il valore risultante non superi il numero di system call supportate dal kernel. Tale mascheramento viene effettuato prima del controllo su se il codice è compatibile con gli indici della system call table. Se la risposta fosse no, si accederebbe all’unica entry al di fuori della tabella che porterà a svolgere lavoro dummy. Ed ecco qui come abbiamo introdotto la sanitizzazione.
+
+- Consideriamo lo statement `regs->ax = sys_call_table[nr](regs)`. Regs è il puntatore allo snapshot di CPU che viene salvato sullo stack. Inoltre, `sys_call_table[nr]` è proprio il puntatore alla funzione che si vuole invocare e che accetta come parametro proprio lo snapshot di CPU regs. Di conseguenza, l’istruzione mira a modificare il campo *ax* di regs inserendovi il valore di ritorno della system call. Non solo: stiamo anche facendo vedere in maniera semplicissima l’intero snapshot di CPU (con tutte le informazioni di livello user) alla system call stessa. Ovviamente questo non ha senso quando la system call invocata non accetta parametri in input. Per risolvere il problema, a partire dalla versione $4.17$ del kernel, dentro la system call table non sono più registrati gli indirizzi di memoria dei front-end dei servizi (i.e. gli indirizzi di memoria delle system call vere e proprie): piuttosto si hanno i puntatori a delle funzioni intermedie che, prima di invocare a loro volta le system call, offuscano lo stack di livello kernel (**wrapper**). Quindi non devo fare il disaccoppiamento user-kernel. Una tecnica per farlo è aggiungere del padding sullo stack in modo tale che la distanza tra lo stack pointer e lo snapshot di CPU con le informazioni relative alla precedente esecuzione in modalità user sia indeterminata. Per creare in **modo automatico** **questo doppio livello di funzioni**, si ricorre alle macro `SYSCALL_DEFINE0`, `SYSCALL_DEFINE1`,…, `SYSCALL_DEFINE6` (una per ciascun numero di **parametri** che possono essere passati alle system call). Quindi mediante queste macro si genera sia il wrapper sia la vera syscall (con il nostro codice). Decido io che nome dargli, e servono per essere identificate.
+
+#### Esempio
+
+```c
+SYSCALL_DEFINE2 (name,param1type,param1name,param2type,param2name) {
+   //actual body implementing the kernel side system call
+}
+
+```
+
+La macro crea una funzione dal nome `sys_name` oppure `__x86_sys_name` (questo è il nome che affido io al wrapper) la quale passa all’effettiva system call soltanto i valori strettamente necessari (i.e. param1name e param2name), offuscando tutte le altre informazioni sullo stack.  
+La system call prende il nome di`__se_sys_name` (dove “se” sta per secure), oppure `__do_sys_name`, dove “*name”* è lo stesso della macro vista sopra. È proprio quest’ultima a implementare il body di `SYSCALL_DEFINE2`.
+
+### Implementazione del dispacher nelle versioni più recenti del kernel
+
+![](img/2023-12-01-16-31-53-image.png)
+
+- Poco dopo l’istruzione swapgs si ha uno `SWITCH_TO_KERNEL_CR3 scratch_reg=%rsp`, che permette di conseguire la **Page Table** **Isolation** (**PTI**) mediante uno switch della page table (dove si passa dalla page table relativa alla modalità user alla page table relativa alla modalità kernel). Quindi col corretto `GS` posso utilizzare la per-cpu-memory. Essa fa alterazione dei registri, ma in maniera *speculativa*. Abbiamo due MSR come già detto: GS corrente e alternativo.
+
+Notiamo che, sebbene si tratti dell’implementazione della funzione `syscall()`, qui stiamo pagando dei costi computazionali notevoli, soprattutto in termini di sicurezza: rispetto alla versione $2.4$ del kernel, vengono eseguite molte più attività prima dell’invocazione vera e propria della system call, e questo pesa in particolar modo sulle applicazioni system call intensive.
+
+## Attacco swapgs
+
+È basato sull’esecuzione speculativa di un pezzo di codice del kernel mediante la branch miss-prediction e sullo sfruttamento del cache side channel per determinare il valore acceduto speculativamente.
+Vediamo un esempio:
+
+```c
+if (coming from user space) 
+   swapgs
+mov %gs: <percpu_offset>, %reg
+mov (%reg), %reg1
+```
+
+Di fatto, qui è possibile dare luogo a una misprediction sulla condizione data dall’if e far sì che il processore, durante l’esecuzione del kernel, preveda che “coming from user space” sia *true* quando invece non si proviene dall’esecuzione in modalità user; di conseguenza, speculativamente, si cambia il segmento `GS` di riferimento (passando da quello utilizzato in modalità kernel a quello utilizzato in modalità user). I page fault sicuramente capitano a livello user, ma a livello kernel? Capita se a livello kernel devo specificare una pagina user (kernel scrive su una page su cui già opera l’user). Caotico! Le istruzioni successive consistono in un accesso al segmento `GS`; nel nostro caso, vengono lette in modo speculativo delle informazioni relative all’esecuzione user mode che, appunto, possono essere recuperate mediante un cache side channel. Devo fare l’operazione *swapgs* dentro l’if, sennò avrei problemi a non cambiare!
+
+### Contromisure
+
+- Effettuare l’**override** **di qualunque** **swapgs** mentre si è già in esecuzione in modalità kernel. Questo, però, richiede un’operazione di patching piuttosto onerosa lato kernel. Cioè sovrascrivo in ogni caso!
+
+- Utilizzo istruzioni serializzanti, così se opero speculativamente e sbaglio, tutto viene squashato.
+
+- Sfruttare la **SMAP** (**Supervisor Mode Access** **Prevention**) dall’hardware. Questo evita l’accesso a una qualunque pagina di livello user mentre si è in esecuzione in modalità kernel. Vedremo successivamente com’è possibile adottare tale contromisura. Usato in *memory management*.
+
+## Compilazione del kernel
+
+Qui *configuro* cose che posso usare durante lo startup Linux, non stiamo facendo lo startup di queste cose! Stiamo solo creando contenuto file system.
+
+Avviene secondo i seguenti step: 
+
+1. `make config`: per ogni sottosistema software, chiede all’utente se il kernel deve includere quel sottosistema software oppure no. È buona norma seguire questo step impostando un apposito file di configurazione; in alternativa, si potrebbe effettuare la configurazione a mano, come:
+   
+   - *allyesconfig*, ma può dare problemi di conflitti.
+   
+   - *allnorconfig*, che invece non da mai errore in quanto è un *set minimale*. Con questo secondo approccio, nel core del kernel non c’è supporto al *virtual file system*. Non viene incluso alcun sottosistema software, ottenendo verosimilmente un kernel con non offre abbastanza servizi.
+   
+   - Scegliere io cosa mettere e non mettere, ma è lungo e non banale.
+   
+   - Prendere un file di configurazione dal web
+   
+   - Se ricompilo la versione del kernel che già possiedo, posso usare il file di config già esistente, nella directory `ls /boot`. Qui ci sono info su compilazione kernel, risultati (cioè immagini dei kernel) e mappe (danno metadati).
+
+2. `make`: esegue la compilazione vera e propria del core del kernel, basandosi su quanto indicato dal file di configurazione. Alla fine della compilazione viene generata un’immagine I del kernel. Utilizza i moduli.
+
+3. `make modules`: esegue la compilazione dei moduli, che sono oggetti che non fanno parte dell’immagine I generata col comando make. I moduli vengono agganciati a I per dare luogo a una nuova immagine I’ del kernel. Chiaramente i moduli possono sfruttare le funzionalità già presenti nel kernel (i.e. nell’immagine I).
+
+4. `make modules_Install` (**ROOT**): effettua l’installazione dei moduli all’interno del sistema, andandoli a inserire nella directory `/lib/modules`. Poiché va a scrivere su delle porzioni del file system che non possono essere modificate da chiunque, è uno step che può essere seguito solo nei panni dell’utente root.
+
+5. `make Install` (**ROOT**): effettua l’installazione dell’immagine del kernel, della system map e del file di configurazione, andandoli a inserire nella directory /boot. Anche questo step può essere seguito solo nei panni dell’utente root.
+
+6. `mkinitrd -o initrd.img-<vers> <vers>`: crea un RAM disk, che è un file system *montato temporaneamente* dal kernel *durante la fase di boot*, e contiene alcuni moduli compilati. Quando il RAM disk è montato, i relativi moduli vengono agganciati a run-time al kernel; dopodiché il file system viene smontato dal sistema. Tale oggetto deve essere generato! **Initrd** è un file system usabile come tale solo su finestra temporale ben precisa, perchè lo monta, estrae e monta i moduli, e poi smonta tale file system.
+
+Infine, affinché il kernel (coi relativi moduli che sono stati compilati, installati ed eventualmente riportati su un RAM disk) sia avviabile a seguito della compilazione e dell’installazione, è necessario aggiornare il **boot loader** attraverso il comando `update-grub` (approfondiremo i dettagli sul boot loader più avanti). 
+
+**Esempio**: `grep HZ /boot/config-[version]` , mi da info sugli switch da interrupt.
+
+**NB**: oggi è anche possibile agganciare una directory al Makefile per la compilazione del kernel; chiaramente tale directory deve contenere a sua volta un altro Makefile per eseguire correttamente gli step di compilazione aggiuntivi.
+
+## System map
+
+Sono dei makefile o anatomie (o tabella o mappa), compilate. È una serie di informazioni che indica qual è la mappa del kernel all’interno dello spazio di indirizzamento lineare. Mi dice cosa posso trovare ad un certo indirizzo logico. Più precisamente, ci dice qual è l’indirizzo lineare in cui si trova ciascuna routine e ciascuna struttura dati del kernel definita a tempo di compilazione. Tuttavia, non tiene conto della **randomizzazione**: perciò, per ottenere l’indirizzo lineare effettivo in cui si trova un oggetto kernel, bisogna sommare un offset randomico all’indirizzo indicato dalla system map.
+
+All’interno della system map, ciascun simbolo (i.e. ciascun oggetto) è associato a un tag che indica di che tipo è quel simbolo:
+
+- **T** = funzione globale.
+
+- **t** = funzione locale all’unità di compilazione.
+
+- **D** = dati globali.
+
+- **d** = dati locali all’unità di compilazione.
+
+- **R** = dati read-only globali. (qui neanche il root può scriverci!).
+
+- **r** = dati read-only locali all’unità di compilazione.
+
+La system map viene utilizzata per il debugging e per l’hacking a run-time del kernel. È inoltre riportata (anche se in modo parziale) all’interno dello pseudo-file  `/proc/kallsysm`, il quale soprattutto in passato è stato sfruttato per il montaggio di nuovi moduli del kernel: di fatto, se un modulo fa uso di una funzione o una struttura dati già presente nel kernel, è necessario averne un riferimento che, appunto, viene fornito direttamente da `/proc/kallsysm`. Questo file è leggibile sia con root (con effettivi riferimenti), se lo leggo a livello user dà indirizzi tutti posti a 0.
+
+## Startup del kernel
+
+I componenti che entrano in gioco durante lo startup del kernel (i.e. mentre il software del kernel viene caricato in memoria) sono: 
+
+- **Firmware**: è un programma codificato sulla ROM (Read-Only Memory). Presente sull’hw. 
+
+- **Bootsector**: è un settore predeterminato di un dispositivo che mantiene il codice dello startup del sistema. Ne sono esempi disco o ssd, è la “prima” zona del dispositivo. Tipicamente prelevo il bootloader, che caricherà il kernel del sistema operativo.
+
+- **Bootloader**: è il codice eseguibile effettivo che viene caricato e lanciato prima di passare il controllo al sistema operativo. Viene mantenuto in parte all’interno del bootsector, in parte in altri settori.  
+  Può essere utilizzato anche per parametrizzare il boot effettivo del sistema operativo.
+
+### Task dello startup
+
+1) Il firmware va in esecuzione, e carica in memoria e lancia il contenuto del *bootsector*. 
+2) Il codice del bootsector viene dunque eseguito e carica a sua volta le altre porzioni del bootloader. 
+3) Il bootloader, in ultima istanza, carica in memoria il kernel del sistema operativo e gli passa il controllo.
+4) **Il kernel esegue le sue azioni di startup**, che possono comprendere l’attivazione del codice software, delle strutture dati e dei processi. Tra i processi attivati figura sempre il cosiddetto **idle** **process**, che serve essenzialmente a far sì che all’interno del sistema *esista sempre almeno un processo in esecuzione.*
+
+**Il bootloader fa il boot, il kernel esegue lo startup del sistema operativo.**
+
+## Bios - Basic I/O System
+
+È il firmware tradizionale dei sistemi x86. È possibile colloquiare con lui lanciando particolari interrupt (e.g. tramite i tasti F1, F2,…). L’interazione col BIOS serve ad esempio per parametrizzare l’esecuzione del firmware all’avvio del sistema, dove la parametrizzazione può determinare l’ordine con cui i bootsector vengono cercati nei diversi dispositivi.
+
+Comunque sia, il primo bootsector contiene il **master boot record** (**MBR**), che mantiene del codice eseguibile e una tabella (la **partition** **table**) con *quattro entry*; ciascuna di queste entry identifica una *partizione* del dispositivo, e il *primo settore di ogni partizione* *può operare come un bootsector*.  
+È possibile anche che una partizione sia suddivisa a sua volta in quattro sotto-partizioni, ciascuna delle quali può mantenere il proprio bootsector (in tal caso parliamo di **partizione estesa**). L’evoluzione è UEFI. Nella pagina seguente sono riportati il MBR e un esempio di schema del dispositivo con il BIOS:
+
+![](img/2023-12-01-16-50-34-image.png)
+
+Il limite di 2 TB per la quantità di memoria a disposizione per i dispositivi sui quali è possibile effettuare il boot è stato superato dalla **UEFI** (**Unified** **Extended Firmware Interface**), con cui si possono raggiungere anche i $9$ zettabyte (= $9 \cdot 10^{21}$ byte).
+
+## UEFI - Unified Extended Firmware Interface
+
+È il nuovo standard per il supporto di base dei sistemi (e.g. gestione del boot). È in grado di eseguire gli **eseguibili EFI** (Extended Firmware Interface) piuttosto che caricare e lanciare semplicemente il codice del MBR. E’ più flessibile, perchè posso impostare delle condizioni che devono verificarsi o meno. Inoltre, per essere configurato, offre delle interfacce al sistema operativo anziché essere raggiungibile esclusivamente tramite l’invio di interrupt.
+
+In UEFI, il partizionamento del dispositivo è molto più complesso rispetto al BIOS ed è basato sulla **GPT** (**GUID** **Partition** **Table**, dove il GUID è il Globally Unique Identifier). Questa tabella è più complessa rispetto alla partition table introdotta precedentemente (taglia variabile) ed è replicata: quest’ultima caratteristica fa sì che, se una copia della GPT dovesse essere corrotta, continuerebbe ad essere possibile raggiungere e utilizzare le partizioni del dispositivo. Con essa identifico le partizioni, poichè fornisce degli *id*, il numero di caratteri è ampia, e permette un numero di collisioni molto limitato. Con GPT possiamo accedere ad una *partizione EFI SYSTEM PARTITION (STARTUP)* ed identifica la zona in cui ci sono gli eseguibili (`/boot/efi`).  
+Il type che evidenzia questa zona è “*vfat*”.
+
+## Task BIOS/UEFI durante il kernel del SO
+
+1. Il bootloader / EFI-loader carica in memoria l’immagine iniziale del kernel del sistema operativo. L’immagine include un **machine setup code** (= codice che effettua il setup dell’architettura), che deve essere eseguito prima che il codice del kernel vero e proprio prenda il controllo.
+
+2. Il machine setup code passa il controllo all’immagine iniziale del kernel, la quale inizia la propria esecuzione a partire dalla funzione `start_kernel()` che si trova in `init/main.c`. Richiama lo startup di altre cose. E’ altamente configurabile, posso dirgli di gestire un tot di memoria rispetto a quella totale che ho, ad esempio. All’inizio **non c'è** per-cpu-memory, però con `smp_processor_id()`, che richiama `cpuid`,  posso riconoscere il primo processore che esegue lo startup. Non posso fare tutto a compile time, e alcune cose vengono generate ed inizializzate dal processore.
+
+**NB**: Tale immagine del kernel è differente sia nelle dimensioni che nella struttura da quella che prenderà il controllo in steady state (i.e. dopo che il sistema è stato avviato del tutto).
+
+**Quindi prima *boot* del bootloader, poi startup del kernel, e poi kernel diventa *steady state.* Per il kernel, possiamo anche parlare di *boot* del kernel, sinonimo di startup.**
+
+## Startup del kernel in macchine multicore
+
+Nei sistemi multi-core o multi-hyperthread, per effettuare il boot di un sistema Linux si possono adottare diverse soluzioni. La più importante consiste nel far eseguire lo startup soltanto a una CPU (detta **master**), mentre le altre (dette **slave**) attendono mediante un busy waiting che venga caricata in memoria l’immagine del kernel in stady state. In questa soluzione, la prima cosa che fa ciascuna CPU è invocare l’istruzione `cpuid`: se risulta essere la CPU$_0$, allora è il master e procede con lo startup del kernel; altrimenti, è uno slave e si limita a fare busy waiting. Il codice che decodifica queste (e altre) attività si trova all’interno del file `head.S` (o una sua variante), il quale viene eseguito da tutti i processori.
+
+  
+
+# Kernel Level Memory Management
+
+Allo startup, eseguiamo attività inizialmente esterne allo stack kernel, poi faccio setup stato processore e memoria. Il software usa indirizzi logici, e devo settare il supporto agli indirizzi fisici, senza considerare la randomizzazione. Tutto ciò che succede ci porta allo *steady-state*. Inoltre, molte cose servono solo allo startup, quindi potrei liberare memoria fisica, soprattutto in termini di sicurezza lascio dei **gadget** usabili per attacco.
+
+## Caricamento del kernel in memoria fisica
+
+La regione della memoria fisica in cui viene caricata l’effettiva immagine del kernel è determinata dal *bootloader* sfruttando la randomizzazione. Di conseguenza, nella zona iniziale della memoria RAM può esserci un buco non utilizzato:
+
+![](img/2023-12-01-19-25-51-image.png)
+
+Ricordiamo che il software del kernel, per effettuare gli accessi in memoria, utilizza tipicamente gli indirizzi virtuali. Perciò, in fase di startup è necessario *organizzare una page table corretta* per essere in grado di raggiungere la zona della memoria fisica desiderata. La tabella è insieme di entry da cui parto da indirizzo logico diretto verso indirizzi fisici, ma a quali indirizzi logici/entry li associamo?
+
+Tutto quello che abbiamo detto per la memoria fisica (RAM), vale anche per la memoria logica (address space): la zona dell’address space delle applicazioni in cui viene posta l’immagine del kernel è, di nuovo, determinata dal bootloader sfruttando la randomizzazione:
+
+![](img/2023-12-01-19-43-45-image.png)
+
+Dunque, nel momento in cui si definisce la page table, è necessario porre attenzione anche nella definizione degli indirizzi logici (da associare poi a quelli fisici). Possiamo avere PT diverse, e quindi collocazioni diverse. 
+
+*Come possiamo definire una page table (raggiungibile dal kernel) che associ correttamente tutti gli indirizzi logici dell’immagine del kernel ai corrispettivi indirizzi fisici in memoria tenendo conto che si ha la randomizzazione del posizionamento del kernel sia a livello logico che a livello fisico?*
+
+È chiaramente necessario conoscere la posizione (l’offset) della *page table del kernel all’interno* *dell’immagine del kernel*; questo impone che la compilazione del kernel abbia dei limiti, ad esempio per quanto riguarda la possibilità di espandere le strutture dati.
+
+![](img/2023-12-01-19-45-20-image.png)
+
+La kernel page table (raffigurata qui sopra) è nota come **identity** **page table**. Durante la fase di startup, prima che la identity page table sia finalizzata, il bootloader sfrutta un’altra page table *preliminare* che serve per ritrovare in memoria l’immagine del “booting kernel” (che ricordiamo essere diversa dall’immagine del kernel in stady state), inclusa l’identity page table;  
+questa page table preliminare è detta **trampoline** **page table**.
+
+![](img/2023-12-01-19-47-28-image.png)
+
+### Caso base - indirizzi non randomizzati
+
+- L’indirizzo fisico dell’identity page table è noto a compile time. So dove viene montata, a partire da `addr 0`.
+- Anche l’indirizzo logico dell’identity page table è noto a compile time (così come qualunque altra porzione del kernel). E’ un offset a partire dalla sua base. 
+- Il codice di startup per la traduzione degli indirizzi virtuali in indirizzi fisici può semplicemente impostare l’identity page table in modo tale che, a ogni indirizzo logico, sia associato il relativo indirizzo fisico già noto a compile time. 
+- Già a questo punto la paginazione può essere avviata sul processore.
+
+### Avvio della paginazione durante lo startup
+
+Tornando allo startup di un sistema Linux multi-core / multi-hyperthread, prima dell’invocazione dell’istruzione `cpuid`, quello che si fa è appunto aprire la paginazione. A tal proposito riprendiamo il codice di `head.S` relativo alle architetture a $32$ bit, che è stato menzionato precedentemente.
+
+```c
+/* Enable paging */ 3:
+movl $swapper_pg_dir - __PAGE_OFFSET, %eax /* eax = indirizzo della memoria logica in cui è locata 
+la page table - offset(dove l’offset indica la differenza
+tra l’indirizzo della memoria logica e l’indirizzo della memoria fisica dove si trova il kernel)
+In tal modo, scrivo su eax = indirizzo della memoria fisica in cui è locata la page table;
+ci serve l’indirizzo fisico e non logico perché il registro cr3 può puntare solo a indirizzi fisici.
+L’offset è di 3 Gb.*/
+movl %eax, %cr3 /* set the page table pointer, scrivo eax su cr3 */
+movl %cr0, %eax
+orl $0x80000000, %eax /* or logico bit a bit, il numero a sinistra è un 1 (a sx) e 31 zeri (a dx) */
+movl %eax, %cr0 /* set paging bit (= indicazione del fatto che si vuole paginare) */
+```
+
+Per quanto riguarda le architetture a $64$ bit che supportano la versione $5$ del kernel Linux, si ha il file `head_64.S`, la cui logica è del tutto analoga:
+
+```c
+addq $(early_top_pgt - __START_KERNEL_map), %rax  /* __START_KERNEL_map == __PAGE_OFFSET */
+... /* here in the middle we account for other stuff like randomization.
+* Qui ci riferiamo al trampolino per lo schema di randomizzazione,
+early_top_pgt NON è la page table a livello kernel.
+L’early è a compile time.*/
+movq %rax, %cr3
+... /* in the end, paging will be activated */
+```
+
+## Patch Meltdown hardware
+
+Abbiamo visto la Page Table Isolation come soluzione *software*, in cui facciamo operazioni non proprio banali, come resettare i TLB. Queste cose *rompono* la randomizzazione, perchè la mappatura in memoria fisica del kernel inizia in un certo punto, quello prima non è mappato. Se Page Table non ci dà info, ci mette in stallo, il che comporta non aver nulla in cache.  
+Se non vado in stallo, non leggo le info per via della patch, ma ho annullato la randomizzazione perchè ho tempi di risposta diversi. Posso migliorare la patch, mappando comunque le pagine non ancora mappate sullo stesso indirizzo di memoria fisica, così non ho più il **delay di tempo**.
+
+## Ram durante lo startup
+
+Come sappiamo, durante lo startup del sistema abbiamo in memoria l’**immagine iniziale del kernel****. Più precisamente, l’immagine iniziale è organizzata in RAM secondo lo schema mostrato nella pagina seguente. (sia nel caso randomizzato che non).
+
+![](img/2023-12-01-20-04-27-image.png)
+
+La roba relativa all’inizializzazione, che corrisponde alla zona in rosso della figura, diventa completamente inutile una volta che il kernel ha raggiunto un comportamento steady state. Tale zona della RAM, dunque, dopo lo startup viene eliminata, e questo in generale lo si fa ogni volta che si hanno delle informazioni divenute inutili in modo tale che:
+
+- Venga ottimizzata la gestione delle risorse (i.e. si ha più RAM libera a disposizione).
+
+- Si abbia un maggior adattamento con l’aumentare della complessità dello startup.
+
+- Si abbia una maggiore sicurezza (e.g. vengono eliminati dei potenziali gadget).
+
+La page table è *non yet final data*.  
+La parte *reachable* consente *lettura* e *scrittura*, ma non può andare oltre le zone colorate.
+
+
+
+### Funzioni ___init
+
+Sono funzioni che devono essere in memoria soltanto durante la fase di boot del kernel.  
+
+#### Esempio
+
+ `__init *start_kernel* (void)`   
+ Tale funzione vivrà solo durante il kernel boot/startup.
+
+La fase di linking del kernel si occupa di posizionare queste funzioni su specifiche pagine logiche. Esse sono identificate all’interno del sottosistema del kernel chiamato **bootmem** (memoria di boot, è un set di metadati con dei bit settati per essere identificati), che viene usato per gestire la memoria quando il kernel non si trova ancora a steady state. Al completamento del boot, queste pagine logiche vengono rilasciate come riutilizzabili e sovrascrivibili.
+
+In bootmem non abbiamo esclusivamente le funzioni marcate come` __init`, bensì è anche possibile allocarvi dinamicamente della memoria.
+
+Oggi si usano i ***memblock*** invece che *bootmem*, qui abbiamo dati che cascano all’interno di specifiche zone NUMA differenti, mentre con bootmem si aveva una visione lineare. Ovviamente cambiano anche le API. Sono tutti allocatori di memoria, il concetto è simile alla mmap, ma con meccanismi diversi!
+
+In definitiva, l’immagine iniziale del kernel (quella relativa alla **fase di boot**) appare così:
+
+![](img/2023-12-03-16-44-41-image.png)
+
+### Reachable Page
+
+Il software del kernel può accedere all’effettivo contenuto di una pagina in RAM semplicemente esprimendo un indirizzo *virtuale* che caschi all’interno della pagina. Le immagini iniziali sono compatte allo startup, aumentano nella fase di boot del kernel. L’unico modo che abbiamo per convertire l’indirizzo virtuale in un indirizzo fisico e, quindi, accedere alla corrispondente locazione fisica in memoria, è disporre di un’apposita page table. Dunque, le pagine che sono rappresentate all’interno della page table sono dette **pagine raggiungibili** (reachable pages).
+
+### Organizzazione della RAM nelle macchine moderne
+
+Come già detto, le macchine moderne (multi-processore / parallele) hanno un’architettura NUMA  (Non Uniform Memory Access) della RAM, in cui la latenza per l’accesso delle informazioni in memoria non è uniforme per tutti i CPU-core: si hanno alcuni banchi di RAM limitrofi a un CPU-core, altri banchi di RAM vicini a un altro CPU-core, e così via (dove ciascun processore risiede in uno specifico nodo NUMA). Di fatto, non siamo attualmente in grado di rendere questa latenza uniforme (ovvero di avere un’architettura UMA – Uniform Memory Access) in maniera efficiente.   
+**UMA**: passo per stesse componenti, poca concorrenza.   
+**NUMA**: CPU arrivano in memoria su componenti diverse, vero parallelismo. Oggi è *main-line*.
+
+
+
+### Numactl
+
+È un comando (`numactl  --hardware`) che permette di scoprire: 
+
+- Quanti nodi NUMA sono presenti in una determinata macchina. 
+
+- Quali sono i nodi NUMA vicini / lontani da ciascun CPU-core. 
+
+- Qual è la distanza effettiva dei nodi NUMA da ciascun CPU-core.
+
+- La taglia di ogni nodo NUMA.
+
+
+
+## Memblock
+
+È l’evoluzione della bootmem che implementa una logica aggiuntiva che consiste nel tenere traccia dei frame di memoria liberi (“free”) e occupati **per ciascun nodo NUMA**. Nonostante le API per gestire la memoria nella bootmem e nel memblock siano leggermente differenti, l’essenza di tali operazioni è rimasta la stessa. In particolare, per quanto riguarda l’allocazione di nuove pagine (“low pages”), abbiamo: 
+
+- La possibilità di ottenere l’indirizzo virtuale delle pagine allocate nella *bootmem*  (mediante l’API `**alloc_bootmem_lowpages()`). Kernel ancora in setup! Stiamo facendo ancora startup. 
+
+- La possibilità di ottenere sia l’indirizzo *virtuale* (mediante le API `memblock_alloc*()`) sia l’indirizzo *fisico* (mediante le API `memblock_phys_alloc()`) delle pagine allocate nel memblock.
+
+Quando ho concluso lo startup, queste non servono più!
+
+## Strutture dati per la gestione della memoria
+
+Si hanno tre principali strutture dati del kernel che supportano la gestione della memoria: 
+
+- **Kernel page table:** è la identity page table, ed è quindi una sorta di tabella delle pagine “ancestrale”, da cui derivano tutte le altre tabelle delle pagine. Serve a mantenere un mapping tra indirizzi logici e indirizzi fisici del codice e dei dati di livello kernel.
+
+- **Core map:** è un array che tiene traccia dello stato dei frame di memoria fisica. Possiamo vederla come costituita da più parti, ognuna associata a un singolo nodo NUMA. 
+
+- **Free list:** è una struttura dati che ci riporta ai frame liberi di memoria fisica. Anch’essa è costituita da più parti, ognuna associata a un singolo nodo NUMA.
+
+**Nessuna di queste strutture dati è già finalizzata nel momento in cui il kernel del sistema operativo viene mandato in startup**. In particolare, la core map e la free list non esistono proprio (le informazioni sui frame di memoria fisica sono date dalla bootmem o dal memblock), mentre *la kernel page table non si trova ancora in uno stato definitivo.* Di conseguenza, alla fine dello startup, le strutture dati devono essere istanziate o modificate.
+
+Nella pagina seguente è riportato uno schema molto semplice che mostra la relazione tra la core map e le free list (dove si può vedere che le *free list* sono collegate alla core map dove si hanno frame di memoria fisica liberi). Free list viene chiamata, interroga Core map per farsi tornare zona.
+
+![](img/2023-12-03-17-00-32-image.png)
+
+Le free list sono accessibili in concorrenza da tutte le CPU per prendere memoria, dobbiamo sincronizzarle. Esistono meccanismi di Caching, in particolare facendo pre-reserving delle locazioni. La kernel page table prende indirizzo lineare (non segmentato), **la segmentazione c’è prima**.  
+Indirizzi logici e poi fisici, si alloca nello spazio lineare con indirizzi assoluti.
+
+**NB:** quando programmiamo a livello kernel, la core map non è direttamente esposta; piuttosto, le API che abbiamo a disposizione (i.e. le API di buddy allocation, che analizzeremo successivamente) utilizzano le free list e, inoltre, sono in grado di gestire correttamente la concorrenza di molteplici thread. Esistono anche *quick list*, perchè sono per-cpu, quindi niente sync.
+
+## Kernel page table
+
+Ci dice come vediamo lo spazio! Gli obiettivi del setup della kernel page table sono:  
+
+1) Permettere al kernel di utilizzare gli indirizzi virtuali per andare a raggiungere le informazioni poste in memoria fisica. 
+
+2) Permettere al kernel di raggiungere la quantità massima di memoria RAM disponibile (che dipende dalla specifica macchina e dallo specifico chipset).
+
+In effetti, uno dei motivi per cui la forma finale della page table non è data all’interno dell’immagine del kernel in memoria è proprio che la quantità di RAM da pilotare deve essere *parametrizzata*. Ma di fatto come si esplica il secondo obiettivo? Durante la fase di startup, in realtà,**il kernel è contenuto in una porzione molto limitata della RAM**, e si espande solo successivamente. Perciò, col tempo, il kernel deve avere la possibilità di accedere a un insieme di indirizzi fisici sempre più ampio, ma questo implica che ci si deve poter espandere su una maggiore quantità di indirizzi logici. E, per aumentare la quantità di indirizzi logici da sfruttare, è necessario cambiare la struttura della kernel page table. Utilizzare questo meccanismo anziché caricare subito l’intera immagine del kernel in RAM presenta un ulteriore vantaggio in termini di efficienza nella fase di setup del kernel: infatti, per caricare subito l’intera immagine in RAM, è necessario prelevare informazioni da un dispositivo di I/O (e sappiamo bene che la comunicazione coi dispositivi di I/O è molto onerosa), mentre, dall’altra parte, è direttamente il software a scrivere delle informazioni in RAM in un secondo momento.
+
+## Pagine di memoria directly mapped
+
+Sono pagine di livello kernel il cui mapping sui frame fisici è basato su un semplice shift (costante) tra gli indirizzi virtuali e quelli fisici.   
+Dati PA = Physical Address, VA = Virtual Address, abbiamo:   
+*PA = y(VA)*, dove y() è una funzione che sottrae un **valore costante** predeterminato al parametro di input (VA). E’ possibile fare l’inverso. Funziona anche con randomizzazione, aggiustando la funzione y().
+
+Non tutte le pagine di livello kernel sono **directly** **mapped**, per cui abbiamo questa situazione:
+
+![](img/2023-12-03-17-10-55-image.png)
+
+Tipicamente, **diverse pagine logiche directly mapped sono mappate su frame fisici differenti**.  
+Tuttavia, non è escluso che una qualche pagina logica non directly mapped venga mappata su un frame fisico che corrispondeva già a una pagina logica directly mapped. Per quanto riguarda la contiguità: - Le pagine *directly* *mapped* risultano contigue sia in memoria logica che in memoria fisica. - Le pagine *non* *directly* *mapped* possono essere contigue in memoria logica ma non contigue in memoria fisica. Posso navigare Identity Page Table per vedere dove è mappata fisicamente, a patto che non ci siano update concorrenti sulla table.
+
+### Zone
+
+È tipico per il kernel del sistema operativo organizzare la memoria fisica in ZONE, ciascuna delle quali determina il tipo di utilizzo delle relative pagine. Le ZONE più note sono: 
+
+- **DMA**: è utilizzata per riservare la memoria a specifiche operazioni di dispositivo; comprende i primi 16 MB di memoria fisica. Legata alla randomizzazione del kernel, da 16 MB in su! 
+
+- **NORMAL**: è utilizzata per le pagine del kernel *directly* *mapped*; comprende la sezione della memoria fisica che va dal megabyte 16 al megabyte 896.
+
+-  **HIGH**: è utilizzata per le pagine del kernel *non* *directly* *mapped* e le *pagine user*; comprende la sezione della memoria fisica successiva al megabyte 896. Elementi lato user non sono MAI directly mapped! Il suo scopo era aumentare la flessibilità. Posso rimapparla in maniera arbitraria per raggiungere zone.
+
+### Caso di Linux nei sistemi x86_64 long mode
+
+Abbiamo $2^{48}$ indirizzi logici. Lo spazio è mappato direttamente, ma la stessa memoria può essere anche presa non directly-mapped, che uso quando ho frammentazione. (quindi ho un doppio mapping, inoltre lo scheAma directly mapped aveva il limite di 1 GB). Prendo pagine logiche contigue (zona arancione) che mappa su memoria fisica, anche appartenente a Numa code diversi. Ottimo anche per la sicurezza, con un mapping sempre 1 $\rightarrow$ 1 sarebbe più facile!  
+Qui ci mettiamo cose che vogliamo mascherare, come le stack areas dei thread! Qui il kernel prende tutta la RAM per il direct mapping. In realtà, può anche prendere l’intera memoria RAM per le pagine non directly mapped.  
+ Questa funzionalità deriva semplicemente dalla possibilità di indirizzare tantissima memoria logica e fisica nei sistemi x86-64: è possibile, infatti, usare $2^{48}$ byte nell’address space logico. *Comunque sia, qui le ZONE non sono più rilevanti,* *ma rimangono nell’architettura.*
+
+![](img/2023-12-03-17-28-47-image.png)
+
+## Organizzazione kernel e struttura page table in i386
+
+### Organizzazione del kernel in i836
+
+Nei sistemi i386 *(x86* *protected* *mode*) avevamo la versione 2.4 del kernel. Qui, allo startup del kernel, l’indirizzamento è basato solo su due pagine grandi 4 MB ciascuna, per cui in questa fase abbiamo un kernel di soli 8 MB e una page table iniziale con due sole entry utilizzabili. La regola di paginazione utilizzata è identificata da appositi bit all’interno della page table. Inoltre, sappiamo che esiste il registro CR3 che punta direttamente alla tabella delle pagine (indicandone l’indirizzo fisico). Di conseguenza, il kernel deve conoscere il posizionamento esatto in memoria della page table in modo tale da poter inizializzare correttamente CR3 in fase di startup.
+
+Nella pagina seguente è riportato uno schema del kernel durante lo startup nei sistemi i386.
+
+![](img/2023-12-03-17-30-24-image.png)
+
+Come è possibile vedere, la page table iniziale è compresa **negli** **8** **MB in cui il kernel** **può espandersi durante la fase di startup**. Anche la *bootmem* si trova lì, e serve per tenere traccia delle aree di memoria libere (“free”) in quegli 8 MB.
+
+Per quanto riguarda l’indirizzamento lineare dei sistemi i386, all’interno di un address space è possibile esprimere al più 4 GB (232) di indirizzi logici. 
+
+- I primi 3 GB sono utilizzati per le informazioni di livello user. 
+
+- L’ultimo GB è utilizzato per le informazioni di livello kernel. 
+
+Nel caso in cui ad esempio il kernel occupi tutta la memoria fisica a disposizione, si può andare incontro a dei conflitti nel momento in cui diviene necessario materializzare in RAM delle pagine di livello utente;  
+in tal caso, la parte user può utilizzare i frame fisici che il kernel le mette a disposizione.
+
+### Struttura page table in i386
+
+Molto spesso le pagine da 4 MB per l’indirizzamento della memoria risultano essere inadeguate. Per questo motivo, i sistemi i386 mettono a disposizione due modi di effettuare la paginazione: 
+
+- **Paginazione a 1 livello**:  
+  Prevede pagine da **4 MB**. Qui gli indirizzi, che sappiamo essere a 32 bit, sono suddivisi in questo modo:   
+  I primi 10 bit identificano la pagina su cui l’indirizzo deve essere mappato (i.e. l’offset della page table che punta a quella pagina);   
+  I restanti 22 bit indicano l’offset all’interno di quella pagina (infatti $2^{22}$ byte = 4 MB). Il vantaggio di questa organizzazione è dato dalla presenza di un’unica page table; tuttavia, spesso, pagine così grandi non sono così agevoli da utilizzare *(basti pensare che, per allocare una struttura dati di pochi byte, bisogna materializzare ben 4 MB di memoria*): di conseguenza, tale organizzazione è tipicamente usata solo durante la fase di startup.
+
+- **Paginazione a 2 livelli**:  
+  Prevede pagine da **4 KB**. Qui gli indirizzi sono suddivisi in quest’altro modo:   
+  I primi 10 bit (**PDE** – **page directory entry**) identificano l’offset della page table di primo livello che punta alla page table di secondo livello da esaminare;   
+  I secondi 10 bit (**PTE** – **page table entry**) identificano l’offset della page table di secondo livello che punta alla pagina su cui l’indirizzo deve essere mappato; infine, i restanti 12 bit indicano l’offset all’interno di quella pagina (infatti $2^{12}$ byte = 4 KB).  
+  Nulla vieta di avere una applicazione *mista*, in cui, partendo da una page table, per alcune entry andiamo direttamente al frame fisico, per altre puntiamo a tabelle che a loro volta puntano ad un frame fisico.
+
+![](img/2023-12-03-17-38-38-image.png)
+
+La page table è necessariamente collocata in memoria in maniera allineata rispetto al frame fisico.  
+Questo vincolo è dovuto al fatto che il registro `CR3` è in grado di esprimere gli indirizzi di memoria con la granularità dei 4 KB. Comunque sia, quando abbiamo una page table da 4 MB, questa è tipicamente racchiusa in un **unico frame di memoria fisica**, mentre quando abbiamo la paginazione a due livelli, è possibile che ciascuna page table si trovi su più frame fisici non contigui tra loro, purché venga mantenuto l’allineamento rispetto ai frame stessi.
+
+Riassumendo, **per passare dalla fase di startup del kernel alla fase steady state**, è necessario far fronte alle seguenti problematiche:
+
+1) È necessario passare da una granularità delle pagine di 4 MB a una granularità delle pagine di 4 KB.
+
+2) È necessario estendere a 1 GB la quantità di memoria logica riservata al kernel.
+
+3) È necessario riorganizzare la page table in due livelli separati.
+
+4) È necessario identificare le aree di memoria libere tra gli 8 MB già raggiungibili per poter espandere la page table. 
+
+5) Non è possibile utilizzare altre facility di memory management al di fuori della paginazione, dato che, come sappiamo, la *core map* e le *free list* esistono soltanto dopo che il sistema è andato in steady state. Dunque, come suggerito in precedenza, per recuperare e sfruttare le aree di memoria libere, si ricorre alla *bootmem*.
+
+Dunque, il layout del kernel 2.4 nei sistemi i386 a steady state è il seguente:
+
+![](img/2023-12-03-17-40-22-image.png)
+
+Ora, negli 8 MB iniziali, si hanno anche le page table di secondo livello, esattamente nelle locazioni che prima erano contrassegnate come “free” dalla bootmem. Nel frattempo, è stato anche necessario modificare i bit delle page table che indicano la regola di paginazione utilizzata.
+
+Di seguito è riportato uno schema riassuntivo sull’evoluzione delle page table durante la fase di boot del kernel:
+
+![](img/2023-12-03-17-40-48-image.png)
+
+## Paginazione nei sistemi i386 in Linux
+
+Linux vede in realtà la paginazione come organizzata a *tre livelli*. Ciascun indirizzo è dunque suddiviso nel seguente modo:
+
+![](img/2023-12-03-17-41-24-image.png)
+
+Dove:
+
+- **PGD** (page general directory) = bit che identificano l’offset della page table di primo livello che punta alla page table di secondo livello da andare a guardare. 
+
+- **PMD** (page middle directory) = bit che identificano l’offset della page table di secondo livello che punta alla page table di terzo livello da andare a guardare. 
+
+- **PTE** (page table entry) = bit che indicano l’offset della page table di terzo livello che punta alla pagina di memoria su cui l’indirizzo deve essere mappato. 
+
+- **Offset** = bit che indicano lo spiazzamento da applicare all’interno della pagina di memoria.
+
+Il numero di bit di ciascuna di queste quattro porzioni degli indirizzi è variabile.
+
+![](img/2023-12-03-17-43-52-image.png)
+
+Tuttavia, sappiamo che i sistemi i386 supportano al più due livelli di paginazione: per motivi di compatibilità, Linux, all’interno dei sistemi i386, **prevede che** **la sezione** **PMD** **degli indirizzi di memoria sia composta da zero bit**. Di conseguenza, si crea il seguente mapping: 
+
+- PGD di Linux $\rightarrow$ PDE di i386 
+
+- PTE di Linux $\rightarrow$ PTE di i386
+
+In Linux è possibile definire il numero di entry da cui è composta ciascuna tabella all’interno del file `include/asm-i386/pgtable-2level.h`:
+
+![](img/2023-12-03-17-52-09-image.png)
+
+- Per compatibilità coi sistemi i386, si pone un numero di entry per la page middle directory pari a 1, che corrisponde appunto ad avere 0 bit associati al campo PMD degli indirizzi e, quindi, a non disporre proprio della PMD.
+
+- Poiché *ciascuna page table occupa 4 KB di memoria*, ponendo 1024 entry per ogni tabella, si hanno delle entry grandi **4 byte**.
+
+- Avere 1024 entry per la tabella di primo livello e 1024 entry per le tabelle di ultimo livello implica che possiamo mappare fino a $1024 \cdot 1024 = 2^{20}$ pagine di memoria distinte.
+
+Inoltre, in kernel 2, all’interno del file `arch/i386/kernel/head.S`, viene definito il simbolo `swapper_pg_dir`, che esprime l’indirizzo di memoria virtuale della PGD che viene correntemente utilizzata. Il valore con cui viene inizializzato *swapper_pg_dir* dipende dalle scelte che si fanno a livello di compilazione (e, quindi, da come viene definita l’immagine iniziale del kernel). D’altra parte, in kernel 3 il simbolo definito per questo scopo è ***init_level4_pgt***, mentre in kernel 4 e 5 è **init_top_pgt**.
+
+Le page table in sé sono invece definite all’interno del file `include/asm-i386/page.h` come delle struct composte da un solo campo (che esprime il contenuto delle loro entry):
+
+![](img/2023-12-03-17-56-34-image.png)
+
+La definizione di tre struct tutte uguali (**i.e. tutte con un unico campo di tipo unsigned long*) evita che il programmatore ponga una variabile $x$ di tipo `PTE_t` uguale a una variabile $y$ di tipo `PGD_t` (operazione ammessa in C se PTE_t, PMD_t e PGD_t fossero semplicemente una ridefinizione del tipo unsigned long), il che sarebbe scorretto dato che si tratta di page table significativamente differenti tra loro (ad esempio presentano bit di controllo diversificati).
+
+### Entry della PDE nei sistemi i386
+
+![](img/2023-12-03-17-58-07-image.png)
+
+- **Page-table base** **address**: indica l’indirizzo di una tabella di secondo livello oppure l’indirizzo di una pagina da 4 MB.
+
+- **Page-table base** **address**: indica l’indirizzo di una tabella di secondo livello oppure l’indirizzo di una pagina da 4 MB. 
+
+- **G** (**global page**): bit ignorato.
+
+- **PS** (**page size**): se vale $0$, vuol dire che il page-table base address indica l’indirizzo di una tabella di secondo livello (che sappiamo essere di 4 KB); se vale $1$, vuol dire che il page-table base address indica l’indirizzo di una pagina di memoria da 4 MB.
+
+- **0** (**reserved**): bit riservato.
+
+- **A** (**accessed**): bit che indica se la pagina è stata acceduta (i.e. se il firmware è riuscito a effettuare una traduzione da indirizzo logico a indirizzo fisico); è uno sticky flag, nel senso che viene settato a 1 dal firmware ma può essere resettato a 0 esclusivamente dal software.
+
+- **PCD** (**cache** **disabled**): se vale 0, vuol dire che il caching è abilitato per la pagina (o il gruppo di pagine) corrispondente alla presente entry; se vale 1, vuol dire che il caching è disabilitato.
+
+- **PWT** (**write-through**): se vale 0, la cache policy utilizzata per la pagina (o il gruppo di pagine) corrispondente alla presente entry è il write-back; se vale 1, vuol dire che la cache policy utilizzata è il write-through.
+
+- **U/S** (**user/supervisor**): se vale 0, la pagina (o il gruppo di pagine) corrispondente alla presente entry gode dei privilegi supervisor; se vale 1, la pagina (o il gruppo di pagine) gode dei privilegi user.
+
+- **R/W** (**read/write**): se vale 0, la pagina (o il gruppo di pagine) corrispondente alla presente entry può essere acceduta solo in lettura; se vale 1, la pagina (o il gruppo di pagine) può essere acceduta sia in lettura che in scrittura.
+
+- **P** (**present**): bit che indica se la presente entry è valida (i.e. se ci porta effettivamente su una pagina o un gruppo di pagine).
+
+**NB**: Non c’è nulla all’interno della entry che ci dice se possiamo fare il fetch (lettura) di istruzioni all’interno della pagina (o del gruppo di pagine) corrispondente oppure no. Questo rappresenta un problema di sicurezza nel momento in cui è consentito effettuare il fetch di qualunque cosa all’interno dell’address space.
+
+### Entry della PTE nei sistemi i386
+
+
+
+![](img/2023-12-03-18-20-19-image.png)
+
+- **Page base** **address**: indica necessariamente l’indirizzo di una pagina.
+
+- **PAT** (**page table** **attribute** **index**): è una don’t care.
+
+- **D** (**Dirty**): bit che indica se la pagina corrispondente alla presente entry è stata acceduta in scrittura (e, quindi, è stata modificata); anch’esso è uno sticky flag.
+
+**NB**: anche qui non c’è nulla all’interno della entry che ci dice se possiamo fare il fetch di istruzioni all’interno della pagina corrispondente oppure no.
+
+**NBB**: all’interno del file header include/asm-i386/pgtable.h sono definite alcune macro che indicano la posizione dei bit di controllo delle entry della PDE o PTE. Esse possono essere utilizzate per estrarre le relative informazioni di controllo dalle entry della PDE o PTE.
+
+![](img/2023-12-03-18-21-32-image.png)
+
+## Relazione tra page table ed eventi di trap/interrupt
+
+Quando viene eseguita un’istruzione I che vuole accedere a un indirizzo di memoria, in caso di TLB miss, è necessario ricorrere alla page table per effettuare una traduzione tra indirizzo logico e indirizzo fisico. 
+
+In tale scenario, il primo controllo che viene fatto è quello sul *presence* *bit*: se la entry della page table esaminata è valida, allora viene generata una trap che porta alla materializzazione del frame fisico in memoria e alla riesecuzione dell’istruzione I (che, di fatto, è risultata essere offending). A valle di tutto questo, potrebbero essere generate anche ulteriori trap: ad esempio, una seconda trap viene essere sollevata se I è un’istruzione di scrittura e, quando viene controllato il bit R/W, emerge che l’indirizzo di memoria target è accessibile solo in scrittura; in tal caso, avremmo un segmentation fault.
+
+### Algoritmo di inizializzazione delle page table in i386 nel kernel 2.4
+
+I seguenti step vengono seguiti ciclicamente: 
+
+1) Determinare l’indirizzo virtuale da mappare in memoria fisica; chiaramente tale indirizzo (indicato dalla variabile **vaddr**) sarà diverso a ogni iterazione, e il limite massimo da considerare è mantenuto all’interno della variabile **end**. 
+
+2) Allocare una PTE (una tabella di secondo livello che gestisce 1024 pagine), che verrà collegata alla tabella di primo livello (PDE) che è stata definita a partire dalla page table relativa alla fase di startup (per cui, in effetti, la PDE e la page table relativa alla fase di startup coincidono). 
+
+3) Popolare le entry della PTE. 
+
+4) Ora il prossimo indirizzo virtuale da mappare (vaddr) sarà 4 MB più avanti rispetto a quello appena mappato. 
+
+5) Saltare allo step 1 fin tanto che esistono ancora indirizzi virtuali da mappare (ovvero fin tanto che vaddr $<$ end).
+
+
+
+**NB**: Ciascuna entry della PDE viene settata per puntare alla PTE corrispondente solo dopo che tale PTE è stata popolata correttamente. Se così non fosse, il mapping della memoria andrebbe perso a ogni TLB miss.
+
+All’interno dell’algoritmo appena descritto, vengono utilizzate le seguenti funzioni: 
+
+- `set_pmd()`: è una macro che implementa il settaggio di una entry della PMD (che, nel caso di Linux, corrisponde al settaggio di una entry della PDE). 
+
+- `mk_pte_phys()`: è una macro che costruisce un’entry della PTE, che include l’indirizzo fisico del frame target. 
+
+- `__pa()`: dato un indirizzo virtuale del kernel, restituisce il corrispondente indirizzo fisico nel caso in cui valga il direct mapping.
+
+Chiaramente esiste anche l’operazione duale a `__pa()`, che è `__va()`. Se anticipassimo `set_pmd` prima del ciclo presente sopra, sarebbe un errore grave. Questo perchè dobbiamo considerare anche il firmware. Se una zona è acceduta, la aggiungo a TLB, e potrei raggiungerla anche senza entry di secondo livello, ma se non ci fosse nel TLB, salterebbe tutto.
+
+## PAE Physical Address Extension
+
+I sistemi x86 a 32 bit considerati finora presentano un limite molto importante: sia per esprimere gli indirizzi lineari, sia per il physical addressing si hanno a disposizione solo 32 bit. Di conseguenza, sia gli address space che la memoria RAM dei calcolatori possono estendersi a un massimo di $2^{32}$ byte = 4 GB. Col passare del tempo, soprattutto per quanto riguarda la memoria fisica, questo limite ha iniziato a risultare particolarmente stretto. A tal proposito, viene in soccorso la **PAE** (**Physical** **Address** **Extension**), che consiste nell’aumento da 32 a 36 del numero di bit utilizzati per il physical addressing; perciò, è ora possibile avere una memoria RAM che si estende fino a $2^{36}$ byte = 64 GB, anche se il limite per gli address space dei processi rimane di 4 GB. Il vantaggio sta dunque nella possibilità di materializzare in memoria fisica pagine relative a un numero maggiore di processi attivi. Questo meccanismo ha però un’implicazione importante: le tabelle delle pagine, per essere in grado di ospitare gli indirizzi fisici estesi, devono avere delle entry di maggiori dimensioni. In particolare, per mantenere la struttura originale delle page table ed evitare così di effettuare modifiche troppo radicali al Makefile del kernel, si è deciso di raddoppiare la dimensione delle entry di tutte le page table e di dimezzarne il numero (da 1024 a 512). Poiché, nella trattazione svoltasi finora, si hanno due livelli di paginazione, si va incontro a un supporto di $\frac{1}{4}$ dell’address space (un fattore 2 è dato dal dimezzamento del numero di entry della page table di primo livello e un fattore 2 è dato dal dimezzamento del numero di entry della page table di secondo livello). Per compensare questa riduzione, si aggiunge un terzo livello di paginazione e, più precisamente, si inserisce una tabella top level chiamata **page directory pointer table**, che dispone appunto di 4 entry ed è puntata direttamente dal registro CR3. Il bit 5 del registro CR4, invece, indica se la PAE è attivata o meno.
+
+## Architetture x86-64
+
+Estendono lo schema PAE mediante il cosiddetto **long** **addressing** **mode**, mettendo a disposizione 64 bit per esprimere gli indirizzi di memoria. Perciò, almeno a livello teorico, consentono un indirizzamento di memoria logica di $2^{64}$ byte. Nelle implementazioni effettive, però, si possono raggiungere al più 248 indirizzi (che comunque consentono di spannare su ben 256 TB).
+Questi $2^{48}$ indirizzi sono nella cosiddetta **forma canonica**, per cui sono suddivisi in due metà dette **higher** **half** e **lower** **half**: in particolare, tra i 48 bit utilizzabili, il più significativo determina automaticamente il valore degli altri bit ancor più significativi (dal 48 al 63). Di conseguenza, gli indirizzi esprimibili sono quelli con i *17 bit* *più significativi tutti pari a 0* e quelli con i *17 bit più significativi tutti pari a 1*: tutti gli indirizzi che cadono nel *mezzo* sono detti non canonici e non sono utilizzabili.
+
+![](img/2023-12-03-19-39-24-image.png)
+
+In realtà, non tutti i sistemi operativi permettono di sfruttare l’intero range di 256 TB di memoria logica / fisica esprimibile con 48 bit. Ad esempio, Linux ad oggi mette a disposizione 128 TB per l’indirizzamento logico e 64 TB per l’indirizzamento fisico. Ciò dipende dal setup della tabelle delle pagine, la parte user di Linux usa la metà, ovvero $2^{47}$, lo scopo è ottimizzare la circuiteria del processore, in quanto è stato visto che con tale valore per indirizzare address fisici era la più adatta.
+
+In definitiva, l’address space di un’applicazione in un sistema x86-64 si presenta così:
+
+![](img/2023-12-03-19-41-07-image.png)
+
+Normalmente, tutto ciò che riguarda direttamente l’applicazione viene posizionato nella parte alta dell’address space (i.e. la porzione con gli indirizzi più bassi rispetto alla zona in nero non utilizzabile), mentre tutto ciò che riguarda direttamente il sistema (e.g. il VDSO) viene posto nella parte bassa dell’address space.
+
+## PAGINA 95
