@@ -2102,7 +2102,6 @@ Ricordiamo che qui non ci sono gate, c'è altro, ma si usa sempre il dispatcher.
 SYSCALL_DEFINE2 (name,param1type,param1name,param2type,param2name) {
    //actual body implementing the kernel side system call
 }
-
 ```
 
 La macro crea una funzione dal nome `sys_name` oppure `__x86_sys_name` (questo è il nome che affido io al wrapper) la quale passa all’effettiva system call soltanto i valori strettamente necessari (i.e. param1name e param2name), offuscando tutte le altre informazioni sullo stack.  
@@ -2244,8 +2243,6 @@ Il type che evidenzia questa zona è “*vfat*”.
 
 Nei sistemi multi-core o multi-hyperthread, per effettuare il boot di un sistema Linux si possono adottare diverse soluzioni. La più importante consiste nel far eseguire lo startup soltanto a una CPU (detta **master**), mentre le altre (dette **slave**) attendono mediante un busy waiting che venga caricata in memoria l’immagine del kernel in stady state. In questa soluzione, la prima cosa che fa ciascuna CPU è invocare l’istruzione `cpuid`: se risulta essere la CPU$_0$, allora è il master e procede con lo startup del kernel; altrimenti, è uno slave e si limita a fare busy waiting. Il codice che decodifica queste (e altre) attività si trova all’interno del file `head.S` (o una sua variante), il quale viene eseguito da tutti i processori.
 
-  
-
 # Kernel Level Memory Management
 
 Allo startup, eseguiamo attività inizialmente esterne allo stack kernel, poi faccio setup stato processore e memoria. Il software usa indirizzi logici, e devo settare il supporto agli indirizzi fisici, senza considerare la randomizzazione. Tutto ciò che succede ci porta allo *steady-state*. Inoltre, molte cose servono solo allo startup, quindi potrei liberare memoria fisica, soprattutto in termini di sicurezza lascio dei **gadget** usabili per attacco.
@@ -2334,8 +2331,6 @@ La roba relativa all’inizializzazione, che corrisponde alla zona in rosso dell
 La page table è *non yet final data*.  
 La parte *reachable* consente *lettura* e *scrittura*, ma non può andare oltre le zone colorate.
 
-
-
 ### Funzioni ___init
 
 Sono funzioni che devono essere in memoria soltanto durante la fase di boot del kernel.  
@@ -2365,8 +2360,6 @@ Come già detto, le macchine moderne (multi-processore / parallele) hanno un’a
 **UMA**: passo per stesse componenti, poca concorrenza.   
 **NUMA**: CPU arrivano in memoria su componenti diverse, vero parallelismo. Oggi è *main-line*.
 
-
-
 ### Numactl
 
 È un comando (`numactl  --hardware`) che permette di scoprire: 
@@ -2378,8 +2371,6 @@ Come già detto, le macchine moderne (multi-processore / parallele) hanno un’a
 - Qual è la distanza effettiva dei nodi NUMA da ciascun CPU-core.
 
 - La taglia di ogni nodo NUMA.
-
-
 
 ## Memblock
 
@@ -2443,7 +2434,7 @@ Tuttavia, non è escluso che una qualche pagina logica non directly mapped veng
 
 - **NORMAL**: è utilizzata per le pagine del kernel *directly* *mapped*; comprende la sezione della memoria fisica che va dal megabyte 16 al megabyte 896.
 
--  **HIGH**: è utilizzata per le pagine del kernel *non* *directly* *mapped* e le *pagine user*; comprende la sezione della memoria fisica successiva al megabyte 896. Elementi lato user non sono MAI directly mapped! Il suo scopo era aumentare la flessibilità. Posso rimapparla in maniera arbitraria per raggiungere zone.
+- **HIGH**: è utilizzata per le pagine del kernel *non* *directly* *mapped* e le *pagine user*; comprende la sezione della memoria fisica successiva al megabyte 896. Elementi lato user non sono MAI directly mapped! Il suo scopo era aumentare la flessibilità. Posso rimapparla in maniera arbitraria per raggiungere zone.
 
 ### Caso di Linux nei sistemi x86_64 long mode
 
@@ -2590,8 +2581,6 @@ La definizione di tre struct tutte uguali (**i.e. tutte con un unico campo di ti
 
 ### Entry della PTE nei sistemi i386
 
-
-
 ![](img/2023-12-03-18-20-19-image.png)
 
 - **Page base** **address**: indica necessariamente l’indirizzo di una pagina.
@@ -2626,8 +2615,6 @@ I seguenti step vengono seguiti ciclicamente: 
 
 5) Saltare allo step 1 fin tanto che esistono ancora indirizzi virtuali da mappare (ovvero fin tanto che vaddr $<$ end).
 
-
-
 **NB**: Ciascuna entry della PDE viene settata per puntare alla PTE corrispondente solo dopo che tale PTE è stata popolata correttamente. Se così non fosse, il mapping della memoria andrebbe perso a ogni TLB miss.
 
 All’interno dell’algoritmo appena descritto, vengono utilizzate le seguenti funzioni: 
@@ -2659,4 +2646,110 @@ In definitiva, l’address space di un’applicazione in un sistema x86-64 si p
 
 Normalmente, tutto ciò che riguarda direttamente l’applicazione viene posizionato nella parte alta dell’address space (i.e. la porzione con gli indirizzi più bassi rispetto alla zona in nero non utilizzabile), mentre tutto ciò che riguarda direttamente il sistema (e.g. il VDSO) viene posto nella parte bassa dell’address space.
 
-## PAGINA 95
+### Page table nelle architetture x86-64
+
+Qui viene introdotta la paginazione a 4 livelli dove il nuovo livello di paginazione è chiamato **Page-Map** **level** e, in tutti i livelli, ogni pagina è composta da 512 entry. Con questo schema è possibile indirizzare $512^4$ pagine di dimensioni pari a 4 KB ciascuna, per cui nominalmente si ha a disposizione una memoria totale proprio di 256 TB. La struttura delle page table è raffigurata qui di seguito:
+
+![](img/2023-12-04-14-20-29-image.png)
+
+
+
+Nella pagina seguente, invece, è riportato il contenuto delle entry delle page table di tutti e quattro i livelli di paginazione.
+
+
+
+![](img/2023-12-04-14-23-58-image.png)
+
+- Per quanto riguarda le entry della tabella di primo livello (PML4E), si hanno due possibilità: presence bit = 0 (entry non valida); presence bit = 1 (entry valida che punta a una tabella di secondo livello).
+
+- Per quanto riguarda le entry delle tabelle di secondo livello (PDPTE), si hanno tre possibilità: presence bit = 0 (entry non valida); presence bit = 1 AND page size bit = 0 (entry valida che punta a una tabella di terzo livello); presence bit = 1 AND page size bit = 1 (entry valida che punta direttamente a una pagina di 1 GB.
+
+- Per quanto riguarda le entry delle tabelle di terzo livello (PDE), si hanno tre possibilità: presence bit = 0 (entry non valida); presence bit = 1 AND page size bit = 0 (entry valida che punta a una tabella di quarto livello); presence bit = 1 AND page size bit = 1 (entry valida che punta direttamente a una pagina di 2 MB.
+
+- Per quanto riguarda le entry delle tabelle di quarto livello (PTE), si hanno due possibilità: presence bit = 0 (entry non valida); presence bit = 1 (entry valida che punta a una pagina di 4 KB).
+
+Di seguito sono riportati tutti i campi della PTE per quanto riguarda le architetture x86-64:
+
+![](img/2023-12-04-14-26-22-image.png)
+
+Notiamo stavolta che è presente un flag che indica se la pagina di memoria puntata è eseguibile o meno (i.e. se vi si può effettuare il fetch delle istruzioni o meno). Tale flag è **XD** (che sta per **execute** **disable**), ed è molto importante dal punto di vista della sicurezza poiché *previene che un attaccante* *inietti* *del codice* *eseguibile malevolo all’interno dei segmenti dell’address* *space* *che non siano di testo (i.e. dati, stack e così via).*
+
+### Direct mapping vs non-direct mapping in x86-64
+
+Una entry della PML4 può essere associata fino a $22^7$ frame di memoria che, moltiplicati per 4 KB, danno luogo a $22^9$ KB = $2^9$ GB = 512 GB. In tal modo, nei chipset più comuni, abbiamo spazio in abbondanza per effettuare il mapping diretto di tutta la RAM disponibile all’interno delle pagine del kernel (ed è quello che si fa tipicamente in Linux). Comunque sia, ogni volta che è necessario, è possibile anche rimappare la stessa memoria RAM in una maniera non diretta.
+
+## Huge Pages
+
+Sono le pagine che possono essere puntate direttamente dalle PDE (ovvero quelle da 2 MB). A livello applicativo, possono essere mappate attivando il flag *MAP_HUGETLB* nella chiamata a mmap() oppure attivando il flag *MADV_HUGEPAGE* nella chiamata a `madvise()`. È possibile vedere quante huge page sono attualmente in uso nel sistema all’interno di `/proc/meminfo` oppure all’interno di `/proc/sys/vm/nr_hugepages`. Le pagine da 1 GB, invece, non sono utilizzabili a livello applicativo, bensì soltanto dal kernel.
+
+Prendere una huge page di 2MB, per una certa regione mmappata, è una ottimizzazione perchè ho pagine fisiche (frame) contigue invece che frame diversi. Però dove è l’ottimizzazione? Perchè è meglio avere pagine vicine? Non c’entra il NUMA, ho facility che permetterebbe di avere indirizzi logici contigui e di unire i frame. La risposta è che se lavoro con pagine sparse, la probabilità che ci siano due linee di cache conflittanti è non nulla, mentre è nulla se pagine contigue. (Se ho due pagine diverse, e tocco la prima linea di cache di una, escludo l’altra perchè avrei un conflitto). Se ho due indirizzi fisici *i* ed *i’*, che corrispondono a stessa linea dell’architettura di cache (sottoinsieme della RAM). Con contiguità in memoria fisica, saranno sicuramente su due linee di cache diverse. Devo specificare quante *huge table* sono utilizzabili.
+
+## Supporto hardware alla virtual memory
+
+Si usano delle shadow copies, ad esempio il CR3 è del processore virtuale. Allora Guest CR3, ci permette di arrivare su tabella di primo livello, poi secondo etc. L’indirizzo fisico non è un vero indirizzo fisico, bensì logico, e viene passato alla tabella delle pagine del processo virtual machine. Qui ci arriviamo con CR3 vero, e prendiamo il vero indirizzo fisico. Magari la VM la vede con indirizzo 0, ma nella realtà non lo è!  
+Il problema è che si compiono attività non consone alla sicurezza. **Ad esempio, se arriviamo ad una pagina non valida** (sia quando passo tre le tabelle primo e secondo livello, sia a Second Level Address Transaction), viene **comunque passato in cache L1**.  Questo perchè “magari” qualcosa in cache L1 c’è, e questo è alla base dell’attacco **L1TF**. Ho thread su VM, ho configurato Page Table per avere indirizzo frame a cui voglio accedere, e ci metto bit di invalidità. **Se vi accedo, niente si mette in mezzo.**
+
+![](img/2023-12-04-14-35-51-image.png)
+
+
+
+## Attacco L1 Terminal Fault L1TF
+
+Sappiamo che, se accediamo a una entry di una page table, il primo controllo che viene effettuato è sul *presence bit*: se quest’ultimo è pari a 0 (entry non valida), potrebbe essere possibile eseguire delle istruzioni in modo speculativo sfruttando le informazioni contenute all’interno di quell’entry della page table. Da qui nasce l’**attacco** **L1TF**, che prevede la seguente idea: se abbiamo una entry di una page table con presence bit pari a 0 (non valida), la entry stessa potrebbe comunque aver propagato i suoi valori (e in particolare il `TAG`, ovvero i bit associati al presence bit) all’interno dell’architettura di memoria. Se il `TAG` viene utilizzato come un indice per andare a sporcare lo stato della cache (cache L1), si compie un attacco dello stesso stile di Meltdown: infatti, poiché il TAG appartiene a una entry non valida della page table, risulta essere un indice non accessibile (i.e. accessibile solo speculativamente).
+
+
+
+![](img/2023-12-04-14-39-55-image.png)
+
+**L’attacco va a buon fine nel momento in cui** **il contenuto della** **entry** **invalida** **della page table mappa su dei dati** **attualmente salvati in cache**. Infatti, una mitigazione che è stata attuata consiste nel fare in modo che il kernel imposti il valore delle entry non valide a valori opportuni che non mappano su dati cachabili. Si tratta di una mitigazione e non della soluzione definitiva perché esiste ancora un caso in cui la vulnerabilità è sfruttabile: quando una macchina virtuale è in esecuzione all’interno della macchina host, è possibile fare una detection delle informazioni all’interno della memoria fisica dell’host a partire dalla macchina virtuale guest.
+
+![](img/2023-12-04-14-41-33-image.png)
+
+La **parte superiore** dello schema (comprendente Guest CR3, Page Directory e Page Table) è relativa alla paginazione che avviene all’interno della **macchina guest**, mentre la *parte inferiore* è relativa alla paginazione che avviene all’interno del *sistema host*.
+
+Nel momento in cui bisogna accedere alla memoria a partire da un’applicazione che gira nella VM guest, si seguono i seguenti passaggi:
+
+- Si ricorre al registro CR3 della macchina guest per recuperare l’indirizzo della PDE guest.
+
+- A partire da un’apposita entry della PDE, si accede alla corrispondente PTE guest.
+
+- Le entry della PTE guest non mappano direttamente su delle pagine fisiche in memoria, bensì conducono alla tabella delle **pagine top** **level** **del sistema** **host.**
+
+- A partire da questo momento, la traduzione dell’indirizzo avviene secondo lo schema tradizionale basato su quattro livelli di paginazione.
+
+A questo punto, performare un attacco L1TF a partire dalla VM guest è abbastanza semplice:
+
+![](img/2023-12-04-14-48-44-image.png)
+
+Supponiamo che in memoria fisica, all’indirizzo $x$, ci sia un dato cachabile, e consideriamo la entry $e_1$ della PTE guest. Allora è possibile fare in modo che $e_1$ sia non valida e abbia un contenuto che, **senza sfruttare la  “second  level address translation”** (del sistema host), punti proprio all’indirizzo fisico $x$.  
+Così, quando un’applicazione che gira all’interno della VM guest tenta di effettuare un accesso in memoria sfruttando proprio la entry $e_1$ della **PTE guest**, poiché il presence bit è pari a 0, *il processore non percorre i 4 livelli di paginazione relativi al sistema host (nemmeno speculativamente), bensì va a verificare speculativamente se il dato associato all’indirizzo $x$ si trova nella cache L1* (in altre parole, se il presence bit vale 0, **l’indirizzo** **che si ottiene dalla PTE guest non viene più considerato come indirizzo fisico GUEST bensì come indirizzo fisico** **HOST**). Se sì, allora la macchina virtuale attaccante utilizza quel dato come indice per spiazzarsi in un probe array: in tal modo, sfrutta il side channel dato dalla cache per estrapolare delle informazioni relative all’esecuzione di altri thread o altre applicazioni, le quali possono anche girare in un’eventuale macchina virtuale vittima che vive all’interno del sistema host. Una condizione necessaria per cui questo attacco vada a buon fine è che l’attaccante e la vittima girino in due hyperthread associati al medesimo CPU-core, in modo tale che condividano la medesima cache L1.
+
+## Core map
+
+È una struttura dati che tiene traccia dello stato (e.g. libero vs occupato) dei frame all’interno del sistema e, quindi, ci permette di fare l’allocazione e la deallocazione delle pagine di memoria. Più precisamente, è un array in cui ciascuna entry corrisponde a un frame della RAM. Ciascuna entry viene rappresentata con la seguente struct C:
+
+![](img/2023-12-04-15-06-00-image.png)
+
+- `struct list_head list`: puntatore alla testa di una lista collegata; permette agli elementi della core map di essere collegati tra loro.
+
+- `atomic_t count`: contatore che tiene traccia del numero di page table entry associati al frame in RAM.
+
+- `unsigned long flags`: insieme di flag che indicano lo stato del frame in RAM.
+
+
+
+## Free list
+
+E' una struttura dati definita nel seguente modo:
+
+![](img/2023-12-04-15-14-44-image.png)
+
+- `struct zone node_zone[MAX_NR_ZONES]`: array contenente le informazioni relative a ciascuna ZONE gestita dalla free list.
+
+- `int nr_zones`: numero di ZONE gestite dalla free list.
+
+- `struct page *node_mem_map`: puntatore alla prima entry della core map legata alla free list. Di fatto, esiste una free list differente per ogni nodo NUMA, e ognuna di esse tiene traccia di un sottoinsieme di pagine libere relativamente a una porzione della core map (in altre parole, possiamo vedere la core map come logicamente suddivisa in più porzioni, ciascuna delle quali è relativa a un nodo NUMA). È per questo motivo che è necessario tenere traccia di quale porzione della core map è associata alla nostra free list.
+  
+  Ma vediamo ora com’è definita la struct zone che abbiamo come primo campo della `struct pglist_data`.
+
+## PAGINA 100

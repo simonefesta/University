@@ -566,3 +566,15 @@ Nelle versioni vecchie l'oggetto `last_pid` esiste sempre, per default settato a
 Nelle versioni recenti ciò non è vero, e devo usare `__task_pid_nr_ns`, usata sempre nei servizi veri. Altrimenti prendiamo `current->pid`.
 
 Montiamo il modulo e lanciamo `user.c` con `./a.out`, che ritorna il pid nel namespace in cui ci troviamo. Con `sudo ../../namespaces/new-namespace`, cambiano namespace per la shell. Rilanciamo `./a.out` vediamo sia pid nel namespace corrente, sia quello *ancestor*.
+
+
+
+## 4 dicembre 2023
+
+### KERNEL LEVEL TASK MANAGEMENT
+
+#### kernel_thread.c
+
+Quando montiamo modulo usiamo `kthread_create`. Lui esegue in `init_module`, facciamo check sul pointer, se tutto ok ritorno il montaggio correttamente. In `thread_function`, mentre esegue, può dormire nella waitqueue specificata, e prima di farlo abilita alcuni segnali. In `begin`, esegue attività cicliche, e viene definita condizione di risveglio, variabile globale `speep_enabled`.  Quando scade il tempo di sleep, eseguirà delle attività.
+
+Prima di uscire, il thread si sgancia dalla sua coda. Con più thread ed una coda sola, i thread sganciati vanno in sezione critica.
