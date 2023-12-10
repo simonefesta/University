@@ -567,8 +567,6 @@ Nelle versioni recenti ciò non è vero, e devo usare `__task_pid_nr_ns`, usata 
 
 Montiamo il modulo e lanciamo `user.c` con `./a.out`, che ritorna il pid nel namespace in cui ci troviamo. Con `sudo ../../namespaces/new-namespace`, cambiano namespace per la shell. Rilanciamo `./a.out` vediamo sia pid nel namespace corrente, sia quello *ancestor*.
 
-
-
 ## 4 dicembre 2023
 
 ### KERNEL LEVEL TASK MANAGEMENT
@@ -578,3 +576,35 @@ Montiamo il modulo e lanciamo `user.c` con `./a.out`, che ritorna il pid nel nam
 Quando montiamo modulo usiamo `kthread_create`. Lui esegue in `init_module`, facciamo check sul pointer, se tutto ok ritorno il montaggio correttamente. In `thread_function`, mentre esegue, può dormire nella waitqueue specificata, e prima di farlo abilita alcuni segnali. In `begin`, esegue attività cicliche, e viene definita condizione di risveglio, variabile globale `speep_enabled`.  Quando scade il tempo di sleep, eseguirà delle attività.
 
 Prima di uscire, il thread si sgancia dalla sua coda. Con più thread ed una coda sola, i thread sganciati vanno in sezione critica.
+
+## 7 dicembre 2023
+
+### file idt qualcosa
+
+è per kernel 5, sul kernel 4 non funziona, perchè non abbiamo la struttura degli handler come nella versione 5.
+
+Chiamiamo `store idt` per scaricare il puntatore alla IDT e numero di entry (tipicamente 256). Se siamo su entry spuria, per poter usare tale getsore dobiamo essere a CPL pari a 0 ovvero eseguire in kernel mode.
+Tramite `get_full_offset` passando indirizzo memoria IDT, la funzione si sposta uslla IDT, sulla entry che vuole. presa tale informazione, ovvero handler primo livello per trap spuria ciò che faccio è chiamare `pack_gate`, (che mette un permesso nella tabella, offerta da Linux) e `patch_IDT`, che prendendo offset gestore spurio, e confrontandolo tramite mask, cerca i byte `e8` che individuano la call. Se è il primo `e8` che trovo, i byte successivi sono shiftati.
+Ottenuto address gestore originale, posso confrontarlo con altro address ottenuto mediante discovery.
+Il `new_call_operand` è nuovo handler, in cui ci arrivo in modo iterativo, sempre calcolando il *displacement*. Ottenuto il valore di $t'$ devo installarlo in memoria: leggo cr0, tolgo protezione, facciamo `cmpxchg` per mettere $t'$ al posto di $t$. Poi `write_idt_entry` per permettere di usare INT lato user. Concludo ri-proteggendo la memoria.
+
+Nel kernel 5 il blocco di codice identificato tramite entry IDT, ovvero gestore di primo livello per trap spuria, presenta una prima call per aprire IDT e poi seconda call per saltare al gestore effettivo.
+
+`my_handler` usa puntatore a struttura regs ed error code, per sapere stack pointer etc alla generazione della trap.
+Nella parte `user.c` c'è ASM con `int $0xff`. Eseguendolo vediamo che siamo passati attraverso trap, essa ci ha detto alcune cose, e poi siamo ritornati.
+
+### kprobe-read interceptor
+
+C'era un bug nella soluzione originale, ovvero:
+avevamo al livello SO un blocco di codice che implementa sysread, e noi piazzavamo return probe, ovvero eseguiamo sia pre-handler che post-handler. Metto sysread in una gabbia quindi, con attività preliminari (che mi permettono di capire i parametri della chiamata, tra cui l'indirizzo di memoria del buffer in cui mi consegnano i dati) e coda (vedo byte quanti e dove). Per prendere i dati da user a kernel usavamo `copy_from_user` BLOCCANTE, perchè la variabile per cpu che ci dice il contesto di kprobe non matcha piu quello che facciamo nella cpu.
+La soluzione è: montiamo modulo, usiamo smp function call per far fare alle cpu il setup di una variabile per cpu che identifica contesto kprobing. Se settata, ci arrivo sempre, e posso sempre sovrascrivere. Come lo facciamo? il software che avevamo scoprira tale posizione quando partivano kprobe, in quanto ci serve stare in una kprobe mentre cerchiamo in memoria. Ciò lo facciamo così: smp function call, nello startup del modulo, applica kprobe, e durante la kprobe si effettua la search.
+
+### hook.c
+
+Fa check versioni. Con `run_on_cpu` chiedo a tutti di eseguire ciò che c'è dentro, è dummy, e posso aggiungerci kprobe.
+La probe che applico è `the_search`, dove prendiamo indirizzo memoria nuova variabile per-cpu. Lo prendo per spostarmi nella zona delle variabili per cpu. Poi prendo indirizzo `temp`, decremento fino a 0, ovvero la zona delle variabili per cpu è stata vista completamente. Poi vedo se il contenuto puntato corrente è pari al contenuto che mi identifica il contesto corrente, ottenuto mediante parametro kretprobe facendo pattern matching. Se lo trovo, aggiorno `successful each counter`. Ogni cpu sa dov'è altra variabile che indentifica contesto. Poi usciamo.
+
+Vediamo poi `pre_hook` in cui facciamo store address, andiamo nella stack area a scrivere 0 in una particolare zona. Faccio check su stdin e pid, se ritorno 1 su probe, la post non viene eseguita. Sennò registro in store address indirizzo in cui memorizzo i dati.
+in `post_hook`, prendo address, vedo se è 0, prendo valore ritorno syscall e mi dice quanti byte ho consegnato. Se <=0 non ho perso nulla, altrimenti facciao copy from user i caratteri consegnati. Dopo `this_cpu_read`, se entriamo in servizio bloccante, mettiamo NULL. Kernel probes eseguite in maniera non-preemptable. Infine `this_cpu_write` ci rimettiamo il contesto dell'esecuzione.
+
+Nell'init module, registriamo la probe (che non fa nulla come detto), prendiamo `smp_call_function` e aspettiamo che venga eseguita da tutti. Poi anche io devo fare setup variabile per cpu. Alla fine `put_cpu`, poi vedo se tutti hanno trovato quello che dovevano trovare mediante contatore atomico. Se tutto ok installo la probe per questo oggetto. Quando smontiamo, `hook-exit` e smontiamo l'unica probe messa nell'init. 
