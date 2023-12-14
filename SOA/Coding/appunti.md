@@ -608,3 +608,101 @@ Vediamo poi `pre_hook` in cui facciamo store address, andiamo nella stack area a
 in `post_hook`, prendo address, vedo se è 0, prendo valore ritorno syscall e mi dice quanti byte ho consegnato. Se <=0 non ho perso nulla, altrimenti facciao copy from user i caratteri consegnati. Dopo `this_cpu_read`, se entriamo in servizio bloccante, mettiamo NULL. Kernel probes eseguite in maniera non-preemptable. Infine `this_cpu_write` ci rimettiamo il contesto dell'esecuzione.
 
 Nell'init module, registriamo la probe (che non fa nulla come detto), prendiamo `smp_call_function` e aspettiamo che venga eseguita da tutti. Poi anche io devo fare setup variabile per cpu. Alla fine `put_cpu`, poi vedo se tutti hanno trovato quello che dovevano trovare mediante contatore atomico. Se tutto ok installo la probe per questo oggetto. Quando smontiamo, `hook-exit` e smontiamo l'unica probe messa nell'init. 
+
+# 13 dicembre 2023
+
+## VIRTUAL FILE SYSTEM
+
+`singlefile-FS` ci permette di installare un nuovo FS. Il file del mio FX `ext4` diventa dove installo il FS.
+
+Per creare FS sul file, dobbiamo creare un file con un certo contenuto. Se lavoriamo con blocchi, il contenuto del file deve essere cosi formato, anche con blocchi vuoti. Nel makefile, con `create-fs`, il comando `dd` è `disk duplicate`, `if` è la sorgente, ovvero lo pseudofile `/dev/zero`, se abbiamo 1024 byte, questo li pone a 0. `of` è la destinazione, che produce l'immagine del file system. Noi scriveremo 100 blocchi da 4096 byte ciascuno. Creaiamo file pari a dispositivo a blocchi cosi espresso. Su questo file ci possiamo installare un FS, aprendo il file e scrivendoci le info struttura del FS. Ciò viene fatto da `singlefilemakefs`. Successivamente si passa al montaggio `mount-fs`, in cui specifichiamo il tipo `singlefilefs`, con `loop`, anche se è un file regolare.
+
+In `singlefilemakefs.c` abbiamo una directory ed un file. Il dispositivo ospitante il FS prevede un block 0 superblocco specifico del FS, nulla a che fare con superblocco generico. Dentro avremo il magic number del FS. Senza, non si è in grado di gestire il montaggio (sostanzialmente è una targa identificante). Nel blocco 1 manteniamo un singolo *i-node*, in quanto la directory è `/` (la root), e quando monto il FS lo faccio ex-novo, non devo storicizzare, ma lo faccio ogni volta. Almeno uno serve, perchè almeno un file c'è, quantomeno la size del file va mantenuta. Gli altri blocchi sono data blocks del file.
+
+In memoria devono esserci 4 strutture: due già mandate in setup dal software del vfs (superblocco e inode), le altre sue sono dentry e inode root. inode root è genrico, sito in cache vfs, va mandato in setup.
+
+Nel codice c'è `inode_get`, per farla allocare con un certo *inode number* (macro definita da noi, di solito $10$), e bloccare a mio vantaggio. Poi setto i campi dell'inode fornito. 
+
+E' presente un altro `makefile`, in cui creiamo file con certa size e vi scriviamo qualcosa. La creazione è come prima, ma questa volta si ha `mkfs.ext4` nel file appena creato. Qui vengono scritte cose più complesse, ma i concetti base sono gli stessi. Anch'esso è montabile.
+
+Con `cat /proc/filesystems`, è uno pseudofile, chiediamo a kernel delle informazioni, che risponde con cosa ha, una per ogni linea. Ci dice i FS che possiamo gestire. Il nostro nuovo *fs* non compare, perchè non abbiamo fatto linking. La facciamo con `sudo make load-FS-driver`. Ovvero stiamo inserendo un nuovo nodo nella lista, contenente le informazioni per identificare superblocco, etc... Dopo questo comando, troviamo il filesystem appena aggiunto. E' marcato come `nodev`, non c'è bisogno di contenuto sul dispositivo, perchè il superblocco li genera exnovo, non li prende dal dispositivo. Molti sono `nodev`, ad esempio quelli in RAM sono tutti così.
+
+Installiamo kernel, e gli diciamo file system root da usare. Quando kernel parte, monta quello. TIpicamente kernel ha lista di FS gestibili, se magic number corrisponde allora ci riesce.
+
+### singlefilefs_src.c
+
+Dentro abbiamo tabella `super_operations` (op sul superblocco) e `dentry_operations` (op sulle d-entry) vuote, non chiameremo mai operazioni specifiche su questo fs, sono assenti.
+
+Quando inizializziamo il modulo con `singlefilefs_init` facciamo:
+
+- registrazione del FS
+
+- passiamo tabella `system_type`, in cui dichiariamo nome, tipo di mount e tipo di kill.
+
+## Namespaces
+
+### makefile
+
+Il file/directory corrente è `./blk-dev`, nel montaggio facciamo l'echo nel caso di successo. C'è anche `unshare`, che usa la syscall `unshare()`, creando nuovo namespace, con un nuovo comando da lanciare, come `/bin/bash`. Questo FS lo vediamo solo noi o i thread generati qui dentro, specificato da `--mount`. Senza, sarebbe condiviso.
+
+Possiamo fare `make create-dev-fs`, abbiamo creato FS nel file. Prima di montarlo, facciamo `make unshare`, siamo in nuovo namespace di **montaggio**, quindi tutti i thread derivati da tale shell lavoreranno qui dentro. Se facciamo `make mount`, eseguiamo le operazioni espresse. `./temp/example-file` mantiene l'output dell'echo.
+
+Se da altra shell ci rechiamo nella directory, `temp` esiste, ma facendo `ls ./temp` la directory è vuota, perchè in altro namespace di montaggio. Poi smontiamo tutto.
+
+### new-namespace
+
+Lancia nuovo thread con `clone()` che vive in un altro namespace di montaggio. Su `child_fn` chiamiamo `unshare(CLOSE_NEWNS)`, per disancorarlo dagli altri. Non basta, con `mount` specifichiamo `MS_PRIVATE`, cioè è privato, su tutti i punti di montaggio che vedo, e noi lo facciamo partendo dalla radice.  Dopo la compilazione, se eseguiamo `make mount`, lo montiamo come prima.
+
+
+
+# 14 dicembre 2023
+
+## VFS parte due
+
+cosa c'è dentro la directory? se c'è qualcosa, voglio aprirla.
+Inizialmente c'è root `/` senza inode, ma per rappresentarla in VFS l'inode serve.
+A questa directory abbiamo associato un driver. Cosa c'è dentro il driver? Vediamo `dir.c`
+Il driver ha una sola operazione nelle file-operation per i file speciali delle directory, `iterate`. Essa è API che permette di consegnare a user una entry della directory. Evitiamo di fare noi operazioni di copy-to-user, e le consegna in *context*. La lettura della directory è infatti iterativa.
+Quando non ci sono altre operazioni, il VFS può essere comunque interrogato ed eseguire cose con regole di default, altrimenti non funzionerebbe nulla. La open di questo file speciale che è una directory funziona ad esempio, anche se non esplicitata.
+La consultazione della directory, ovvero `onefilefs_iterate` richiede come parametri la sessione e un puntatore a `dir_context`.
+Se uno volesse scorrere gli elementi, questi ci sono? No, quindi col `dir_context` otterremo info su directory esistente, genitore ed eventuali altri file. ` .. [fileEsistente]` è ciò che tipicamente viene tornato. 
+
+- L'informazione sullo 0-esimo elemento ritorna `.`, c'è anche parametro `i-node number` (quello messo nella macro da noi). `DT_UNKNOW` vuol dire che non sappiamo nulla sul tipo di file, poichè a POSIX non interessa.
+
+- L'informazione sul primo elemento sarà `..`.
+
+- Se l'informazione è sulla seconda posizione, sarà il nome del file.
+
+Carichiamo con `sudo make load-FS-driver`, per poterlo gestire.
+Poi montiamo il file con `-o loop` (quindi lo facciamo con dispositivo a blocchi). Ovvero `sudo make mount-fs`. Ritornerò tre elementi, con `ls -la ./mount/`
+
+- "."
+
+- ".."
+
+- "the-file"
+
+Cosa manca? vogliamo aprire `the-file`, e poi chiamarci le read.
+Per la prima cosa, serve i-node associato al nome, ovvero tramite `lookup`.
+Aprendo `file.c`, nelle i-node operations facciamo solo `.lookup`, mentre per le file operations implementiamo la `.read`. Si può aprire con la regola di default.
+Vediamo `onefilefs_read`:
+Prende puntatore a file, e info per quanti byte scaricare.
+Non è sincronizzata, quindi ci sarebbero operazioni in concorrenza.
+Se `*off>=file_size`, ovvero eccediamo la dimensione del file, ritorniamo $0$.
+Poi vediamo **dove** consegnare i dati. Dato un offset, e se i dati eccedono l'offset, allora ritorna solo la porzione che si può fornire, il resto verrà fornito ad una prossima chiamata. Alla fine chiamiamo `sb_bread`, ci serve il superblocco (ottenibile grazie ai riferimenti tra dentry e inode) e il blocco da leggere.
+
+Non c'è crittografia, tuttavia esiste tra i parametri `*singlefilefs_mount` un certo `void *data`, tipicamente oggetti separati da virgola, usabili come vogliamo, ad esempio passando una *chiave*.
+
+Vediamo ora la `lookup`, operazione che ci permette di creare in memoria inode e dentry a cui qualcuno cerca di accedere. Per crearlo nel VFS, devo associarlo a qualcosa, in particolare al parent inode (ovvero directory root). Un oggetto per esistere richiede anche la presenza del parent e cosi via (è come dire che se stiamo in una sottocartella, dobbiamo sapere dove sia il genitore). Passiamo anche pointer a *dentry*, quindi è già stata allocata, allora bisogna trovarla (consultando il contenuto della directory, cosa che abbiamo fatto prima).
+Dentro la funzione, confrontiamo il name della dentry con `UNIQUE_FILE_NAME` (file che sto gestendo), se non rispettato ritorniamo NULL. Nel caso ci sia matching:
+
+- se dobbiamo mettere in memoria inode generico, ci dobbiamo mettere info specifiche di quel file, dove le prendiamo? dall'unico inode, a spiazzamento 0, che abbiamo. Dentro c'è scritta lunghezza file. Dobbiamo però allocarlo questo inode, visto che ad ora non esiste. Lo facciamo con `get_locked` (con indice 1), abbiamo pointer, e ci chiediamo se esisteva già in cache. Se sì, l'oggetto era stato già aperto, allora ritorno *child_dentry* in quanto già collegata. Altrimenti popolo l'inode, identificando owner, file operations etc.. essendo un file. Poi leggiamo blocco con indice 1, ovvero dove c'era l'inode, e mi prendo la size.
+  Poi facciamo `d_add` e `dget`, infine liberiamo l'inode.
+
+Facendo `cat ./mount/the-file`, vediamo il contenuto.
+
+Vediamo il sorgente `singlefilemakefs.c`, ovvero come è fatto il file system:
+Quando lo si lancia, bisogna avere nome di dispositivo o di file su cui fare il lavoro. Poi si chiama la open, si fa il pack del superblocco, e poi si effettua la write.
+
+
+Nel blocco 0esimo scrivo blocco, dopo 4096 byte inode, dopo altri 4096 byte le altre cose.
