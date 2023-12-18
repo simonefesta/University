@@ -653,8 +653,6 @@ Se da altra shell ci rechiamo nella directory, `temp` esiste, ma facendo `ls ./t
 
 Lancia nuovo thread con `clone()` che vive in un altro namespace di montaggio. Su `child_fn` chiamiamo `unshare(CLOSE_NEWNS)`, per disancorarlo dagli altri. Non basta, con `mount` specifichiamo `MS_PRIVATE`, cioè è privato, su tutti i punti di montaggio che vedo, e noi lo facciamo partendo dalla radice.  Dopo la compilazione, se eseguiamo `make mount`, lo montiamo come prima.
 
-
-
 # 14 dicembre 2023
 
 ## VFS parte due
@@ -704,5 +702,100 @@ Facendo `cat ./mount/the-file`, vediamo il contenuto.
 Vediamo il sorgente `singlefilemakefs.c`, ovvero come è fatto il file system:
 Quando lo si lancia, bisogna avere nome di dispositivo o di file su cui fare il lavoro. Poi si chiama la open, si fa il pack del superblocco, e poi si effettua la write.
 
-
 Nel blocco 0esimo scrivo blocco, dopo 4096 byte inode, dopo altri 4096 byte le altre cose.
+
+## Lunedi 18 dicembre 2023
+
+## VIRTUAL FILE SYSTEM
+
+### major-minor-management
+
+`baseline-char-dev.c`, installiamo device driver. Dentro avremo, diverse da null, solo `open`, `release` (tipo close), `write`, `read`. Le segnature sono classiche, perchè abbiamo pointer a struct file cioè sessione o pointer all'i-node. Internamente abbiamo major e mutex. Che ci facciamo?
+La `dev_open` fa try-lock, se fallisce vuol dire che è già usato.
+
+La `release`, fa unlock della `open`, cioè chiusura sessione.
+
+Nella `write` ritorniamo $1$, quindi concettualmente fa nulla, è a scopo didattico. All'inizio facciamo controlli sulla versione di Linux, diciamo che qualcuno ha chiamato una write su major e minor. Dove li prendo? uso MACRO `MAJOR` e `MINOR` in `d_inode->i_rdev`. Come risalisco all'inode? abbiamo pointer sessione `filp`, entriamo in `f_dentry`, e poi in `inode`.
+
+La `read` ritorna $0$, ovvero non ci sono dati da consegnare, stampando le operazioni effettuate.
+
+Nella `init_module` chiediamo un major, non lo forniamo noi. Specifichiamo in `register_chrev` DEVICE NAME, range di minor number.  Quando smontiamo modulo, facciamo unregister.
+
+Visto ciò, da terminale facciamo `sudo insmod baseline-char-dev.ko`, abbiamo quindi altro software chiamabile con IO, tra cui `iotcl`, che fa controlli su device IO. Vediamo con `dmesg` che ritorna $241$ come major number.
+
+Creiamo nodo con `mknod /dev/mynode c 241 0` cioè char device etichettato con targa  `c`, major `241`, minor `0` (basta che sia nel range).
+Se facciamo `echo "pippo" > /dev/mynode`, e dopo `dmesg` vediamo con tutte le scritture. Il comando `echo` ha sempre residui e quindi porta a numerose operazioni. Posso smontare driver senza eliminare i nodi? Si, ma l'apertura loro porterebbe al fallimento.
+Il nome `my-node` non è essenziale, perchè identificable mediante la targa.
+
+`sudo rrmod baseline_char_dev` per smontarlo.
+
+### Driver concurrency
+
+Maniera basica per creare oggetto in grado di gestire la concorrenza su minor numbers. Se diversi ok, altrimenti gestiamo specifica istanza.
+In `driver-concurrency.c` abbiamo Mutex per gestire l'istanza del driver. Col minor number arriviamo in oggetti che a loro volta hanno mutex, per dire che l'oggetto è correntemente occupato `busy`. Supponiamo di avere oggetto IO targato con minor e major su sessione, possono esserci operazioni concorrenti (thread ad esempio), quindi altro mutex `operation_synchronized`.
+
+Vediamo la `dev_open`:
+Se minor non va bene, ritorna errore, dispositivo non pilotabile.
+Se single istance, proviamo a prendere lock globale, se l'oggetto è single sessione, prendiamo altro lock, associato allo specifico oggetto.
+
+
+Nella `release`, prendiamo minor rispetto i-node e la sessione su cui si lavora, rilasciando i lock.
+
+La `write` è basica: siamo su sessione, se qualcuno la chiama, allora fino ad ora è tutto ok, prendiamo lock delle operazioni sull'oggetto.
+Mi viene passatto offset su cui scrivere, vedo se eccedo taglia massima (allora non ci sarebbe spazio), altrimenti faccio `copy_from_user` in cui riportiamo i byte passabili, ma non è detto passino tutti (se vado in zona non accessibile non posso prenderli).
+La `read` è molto simile.
+
+`dev_ioctl`, possiamo passare comando arbitrario, dentro stampiamo la chiamata di tale operazione.
+
+La `init_module` inizializza buffer per oggetti di IO. Se prendiamo memoria da buddy allocator, dobbiamo allocarla, altrimenti ci viene tolta.
+
+Parte user:
+
+Abbiamo dei thread, prendono path = device name, poi si chiama open per aprirlo. Poi scriviamo per $1000$ volte. Il programma si lancia con `[NomeDispositivoCheCreiamo] MAJOR MINORS`
+
+Poi creiamo, `minors` volte, impacchiamo i parametri e li passiamo al thread, prima di metterci in pausa.
+
+Giriamo con `sudo insmod driver-concurrency.ko`, con `dmesg` vediamo che `major number = 241`, che useremo per avviare il tutto.
+
+
+Con `ls -la /dev/nvme0` vediamo i block device, lavorati con block device driver. Vediamo in giallo la partizione dell'hard disk. Quindi per lavorare con hard disk creo nodo, dico driver e ci lavoro.
+
+### BROADCAST DEVICE
+
+Oggetto che, dato nodo su file system e ci scrivo, viene chiamato driver che usa driver di altri nodi. Esiste un nodo su cui lavoriamo in IO, e tale nodo per poter essere usato necessita di un certo driver. Il processo grafico che richiede terminale funziona cosi, in cui immettiamo dati da tastiera.
+
+In `broadcast.c`, possiamo chiamare funzione che va a scrivere su set di destinazioni target, ovvero tutti i dispositivi `pts` di IO. Sono tutti nodi con minor e major number, gestibili con specifico driver.
+
+In `print_stream_everywhere`, li apriamo con `filp_open()` per avere pointer verso di loro, e poi richiamando le operazioni.
+La `open` ritorna sempre $0$, la `close` è inerme, la `write` fa chiamata a `print_stream_everywhere`. per tutte le stringhe nell'array, finchè non troviamo NULL, facciamo `filp_open` su `targets[i]`, ovvero puntatore a sessione che richiama driver per fare le operazioni.
+Il ritorno della `filp_open` deve essere coerente e poi `vfs_write` (senza canale IO, perchè è kernel, non sono applicazioni che partono da codice user), che prende sessione, oggetto, e offset su cui lavorare. Ciò passa controllo ad altro driver, quindi noi siamo un wrapper che chiama altri. Poi `filp_close`.
+
+Avviamo con `sudo insmod broadcast.ko`, poi con `dmesg` prendiamo $241$, e poi creiamo oggetto `mknod /dev/broadcast c 241 0`.
+Abbiamo oggetto con driver, se ci lavoriamo andiamo in broadcast su altri oggetti. Con `echo "ciao" > /dev/brodcast` vediamo in output "ciao", in quanto il terminale era uno degli oggetti elencati, oltre ad altri terminali.
+
+
+
+### Process controller
+
+Crea nodo, quando ci facciamo `write`, parte driver che cambia contenuto di AS di *altro* processo. Qui serve process id, indirizzo di memoria e valore da scrivere.
+Nel process-controller.ko abbiamo thread che chiama sycall write per scrivere a livello kernel. Questo thread è i nun processo, noi dobbiamo andare in altro processo, a scriverci. Noi abbiamo una page table, tocchiamo solo roba nostra, come tocco l'altro?
+Se facessimo `copy_to_user` scriveremo su di noi, non sull'altro.
+Ci serve Thread Control Block, PML4 ed MM, oggi più facile con una API che permette ciò. 
+In `process-controller.c` ci sono riferimenti a CR3, a noi interessa la `sszie_t hit_write` in cui prendiamo dei dati dal nostro AS, che prendiamo con `copy_from_user`, poi facciamo parsing per vedere se ok (process id, indirizzo mem, valore da scrivere). Se tutto ok, scriviamo queste informazioni . Poi prendiamo `pml4`, altrimenti non posso resettare CR3 per tornare su tabella e tabella MM (sennò non posso lavorare sulla mia area di memoria).
+Se l'oggetto esiste e sta continuando ad esistere (cioè siamo in rcu_read_lock) prendiamo la MM con `get_task_mm` (prima era una cosa manuale, nella MM ci siamo anche noi!). Poi rilasciamo `rcu_read_unlock`, vediamo se MM esiste, poi check su `pgd`, e riscriviamo CR3 per la nuova page table. Usiamo nostra MM e page table dell'altro oggetto. **Per scrivere su un certo AS dobbiamo essere su quell'AS.**
+Poi restoriamo MM e CR3, e tabella di management, che porterebbe a smontare l'AS se non c'è nessuno (ma lo fa il kernel).
+Per la `init_module`, ci registriamo e prendiamo major number, la cleanup deregistra.
+
+
+Questo programma è potente, possiamo toccare e modificare tutto.
+
+`sudo mknod /dev/controller c 241 0`, è char device.
+Su ALTRA SHELL, abbiamo `user.c`, e facciamo mmap, se non li mappiamo la pagina non esiste in memoria. Potrebbe però anche già esistere, magari avendoci scritto col controller. Abbiamo un while infinito, in cui si controlla `val`, che non viene cambiato nel codice. Però col controller è modificabile.
+
+Terminale user: `./user/a.out`, che ritorna gli elementi da mettere in echo.
+
+Terminale Originale: `echo "[process id] [indirizzo me] [val da scrivere]" >/dev/controller`
+
+
+
+Tutto ciò che vediamo nei terminali è apparenza, è inutile guardare senza sapere cosa c'è dietro.
