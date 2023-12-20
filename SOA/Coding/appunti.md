@@ -738,7 +738,6 @@ Vediamo la `dev_open`:
 Se minor non va bene, ritorna errore, dispositivo non pilotabile.
 Se single istance, proviamo a prendere lock globale, se l'oggetto è single sessione, prendiamo altro lock, associato allo specifico oggetto.
 
-
 Nella `release`, prendiamo minor rispetto i-node e la sessione su cui si lavora, rilasciando i lock.
 
 La `write` è basica: siamo su sessione, se qualcuno la chiama, allora fino ad ora è tutto ok, prendiamo lock delle operazioni sull'oggetto.
@@ -757,7 +756,6 @@ Poi creiamo, `minors` volte, impacchiamo i parametri e li passiamo al thread, pr
 
 Giriamo con `sudo insmod driver-concurrency.ko`, con `dmesg` vediamo che `major number = 241`, che useremo per avviare il tutto.
 
-
 Con `ls -la /dev/nvme0` vediamo i block device, lavorati con block device driver. Vediamo in giallo la partizione dell'hard disk. Quindi per lavorare con hard disk creo nodo, dico driver e ci lavoro.
 
 ### BROADCAST DEVICE
@@ -773,8 +771,6 @@ Il ritorno della `filp_open` deve essere coerente e poi `vfs_write` (senza canal
 Avviamo con `sudo insmod broadcast.ko`, poi con `dmesg` prendiamo $241$, e poi creiamo oggetto `mknod /dev/broadcast c 241 0`.
 Abbiamo oggetto con driver, se ci lavoriamo andiamo in broadcast su altri oggetti. Con `echo "ciao" > /dev/brodcast` vediamo in output "ciao", in quanto il terminale era uno degli oggetti elencati, oltre ad altri terminali.
 
-
-
 ### Process controller
 
 Crea nodo, quando ci facciamo `write`, parte driver che cambia contenuto di AS di *altro* processo. Qui serve process id, indirizzo di memoria e valore da scrivere.
@@ -786,7 +782,6 @@ Se l'oggetto esiste e sta continuando ad esistere (cioè siamo in rcu_read_lock)
 Poi restoriamo MM e CR3, e tabella di management, che porterebbe a smontare l'AS se non c'è nessuno (ma lo fa il kernel).
 Per la `init_module`, ci registriamo e prendiamo major number, la cleanup deregistra.
 
-
 Questo programma è potente, possiamo toccare e modificare tutto.
 
 `sudo mknod /dev/controller c 241 0`, è char device.
@@ -796,6 +791,21 @@ Terminale user: `./user/a.out`, che ritorna gli elementi da mettere in echo.
 
 Terminale Originale: `echo "[process id] [indirizzo me] [val da scrivere]" >/dev/controller`
 
-
-
 Tutto ciò che vediamo nei terminali è apparenza, è inutile guardare senza sapere cosa c'è dietro.
+
+# 20 dicembre 2023
+
+## Virtual file system
+
+### sys-example
+
+in `sys-example.c` abbiamo `show` e `store`. Rappresentiamo in sys il contenuto di una variabile, cosa già fatta con i parametri di un modulo, ovvero ci permette di vedere il contenuto di una variabile di un modulo. Se ci vengono dati delle informazioni, vengono stampate.
+
+Nella scan, lavoriamo sul contenuto effettivo della variabile.
+
+`the_attribute` è di tipo `kobj_attribute`, contenitore di attributi, che andiamo ad inizializzare. Poi possiamo chiamare API che prendono puntatore al campo attributi di tale oggetto. Ad esempio, c'è `kobject_create_and_add`, che ci permette di aggiungere una directory `NAME` e collegarla ad un'altra directory `kernel_kobj`. Ci viene ritornato pointer alla kernel object della nuova directory, per poi agganciare, tramite `sysfs_create_file`, gli attributi.
+Fatto ciò, in sys avremo nuova directory NAME con file interno (il cui nome è stato passato in `kobj_attribute`).
+
+Fatto ciò, montiamo `sudo insmod sys-example.ko`, e poi `la /sys/kernel/SYS\ BASELINE\MODULE/var`, su cui possiamo scrivere mediante `echo`.
+
+Quando montiamo modulo (cioè kernel object, ovvero un qualcosa composto da serializzazione e metadati) viene usato driver apposito per il linking.
