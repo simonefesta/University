@@ -809,3 +809,31 @@ Fatto ciò, in sys avremo nuova directory NAME con file interno (il cui nome è 
 Fatto ciò, montiamo `sudo insmod sys-example.ko`, e poi `la /sys/kernel/SYS\ BASELINE\MODULE/var`, su cui possiamo scrivere mediante `echo`.
 
 Quando montiamo modulo (cioè kernel object, ovvero un qualcosa composto da serializzazione e metadati) viene usato driver apposito per il linking.
+
+# 21 dicembre 2023
+
+## Security
+
+### Shell
+
+La zona dati è eseguibile.
+
+## ROP
+
+Abbiamo server generico TCP, di cui ci interessano solo i gadget.
+
+Il makefile non ha stack area seguibile (`-fno-stack-protector`).
+Il `TCP-generic-server` ha blocco dati (eseguibile) che rappresentano alcune istruzioni, e delle NOP, poi altre istruzioni, altro codice inutile,... fino ad arrivare a `syscall`, questi blocchi ci permettono di chiamare syscall e poi shell, ma non in maniera contigua, bensì con i jmp di cui abbiamo visto, sfruttando gadget. Presenta anche `show`, che mostra qualcosa a chi lo chiama. Conosciamo l'indirizzo di memoria che ci porta alla prima isruzione. Il resto è lettura e scrittura su socket.
+C'è `memcpu((char*)buffer,(char*)str.size`, che è blocco codice debole.
+
+Il `malicious-client` assembra stringa di attacco, prendendo dei caratteri (che il server scriverà), passando anche l'attack address (che noi assumiamo essere noto), poi incrementiamo di $64$, come i byte di differenza dai primi due gadget, e si rifà tutto per un'altra volta. (3 volte totale). Poi passiamo il tutto al server. Poi ci prendiamo l'esito. Di la lanciamo shell a cui lanciamo comando.
+Eseguiamo `./the-server`, e su altra shell `telnet 127.0.0.1 2345`, scriviamo "ciao" e lui ci risponde con "ciao" e indirizzo gadget.
+Chiudiamo e lanciamo `./the-attacker -a 127.0.0.1 -p 2345 0x400e58`. Stiamo parlando con shell e possiamo eseguire un attacco, il server se è partito con uid=0 posso farci quello che voglio, i particolare con `cat` possiamo vedere tutte le pw.
+
+### kprobes
+
+Implementiamo un mini *reference monitor*, quando andiamo in `exec` c'è una `prob` che controlla che l'utente che controlla l'`exec` se sia root o meno. Definiamo una lista nera con `("bash","sudo","NULL","SU","NULL")`.
+`su`, se escluso, ci permette di diventare root, ma poichè per farlo chiama una shell, non potrà comunque fare nulla.
+Per non far eseguire la `exec` gli annullo i parametri.
+Si installa con `sudo insmod reference-monitor.ko`.
+Poi lanciamo `su`, diventiamo root, ma senza successo. Non possiamo fare niente, pur essendo root. Se ritorno normale, posso rifare tutto, perchè i controlli erano "*limitati*" al sudo.
