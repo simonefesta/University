@@ -1,0 +1,261 @@
+SCALETTA LEZIONE SERT 17.12.2020 (E08)
+
+1 Definizione di uno scheduler per task periodici a priorita' fissa
+  1.1 Task periodici caratterizzati da
+      1.1.1 Periodo
+      1.1.2 Priorita'
+      1.1.3 Job (funzione da eseguire ad ogni rilascio)
+      1.1.4 Nome (per debug)
+  1.2 Scheduler a priorita' fissa a livello di task
+  1.3 Numero massimo di task prefissato (default 32, modificabile)
+  1.4 Scheduler basato sul tick, ma invocato anche al completamento di un
+      job
+  1.5 Inizialmente i job saranno non interrompibili
+  1.6 Osservare che l'implementazione di uno scheduler a priorita' fissa
+      non ha bisogno di memorizzare la scadenza relativa dei task
+      1.6.1 In fase di creazione del task il progettista puo' scegliere
+            di considerare la scadenza relativa impostando opportunamente
+            la priorita' statica, ad esempio per ottenere Deadline 
+            Monotonic
+
+2 Definizione della struttura che descrive un task (in comm.h)
+  +-------------------------------+
+  |#define MAX_NUM_TASKS 32       |
+  |typedef void (*job_t)(void *); |
+  |struct task {                  |
+  |    int valid;                 |
+  |    job_t job;                 |
+  |    void *arg;                 |
+  |    unsigned long releasetime; |
+  |    unsigned long released;    |
+  |    unsigned long period;      |
+  |    unsigned long priority;    |
+  |    const char *name;          |
+  |};                             |
+  +-------------------------------+
+
+3 Implementazione del task nel file tasks.c
+  3.1 Dichiarazione di un vettore di descrittori di task
+  +--------------------------------------+
+  |struct task taskset[MAX_NUM_TASKS];   |
+  |int num_tasks;                        |
+  +--------------------------------------+
+  3.2 Inizializzazione del vettore di descrittori di task:
+  +-------------------------------------+
+  |void init_taskset(void)              |
+  |{                                    |
+  |    int i;                           |
+  |    num_tasks = 0;                   |
+  |    for (i=0; i<MAX_NUM_TASKS; ++i)  |
+  |        taskset[i].valid = 0;        |
+  |}                                    |
+  +-------------------------------------+
+  3.2.1 In realta' questa funzione e' del tutto inutile in quanto sia
+        taskset che num_tasks sono nella sezione .bss che viene
+        inizializzata a zero durante il bootstrap
+  3.3 Creazione di un task:
+  +--------------------------------------------------------------+
+  |int create_task(job_t job, void *arg, int period,             |
+  |                int delay, int priority, const char *name)    |
+  |{                                                             |
+  |    int i;                                                    |
+  |    struct task *t;                                           |
+  |    for (i=0; i<MAX_NUM_TASKS; ++i)                           |
+  |        if (!taskset[i].valid)                                |
+  |            break;                                            |
+  |    if (i == MAX_NUM_TASKS)                                   |
+  |        return -1;                                            |
+  |    t = taskset+i;                                            |
+  |    t->job = job;                                             |
+  |    t->arg = arg;                                             |
+  |    t->name = name;                                           |
+  |    t->period = period;                                       |
+  |    t->priority = priority;                                   |
+  |    t->releasetime = ticks+delay;                             |
+  |    t->released = 0;                                          |
+  |    irq_disable();                                            |
+  |    ++num_tasks;                                              |
+  |    t->valid = 1;                                             |
+  |    irq_enable();                                             |
+  |    printf(Task %s created, TID=%u\n", name, i);              |
+  |    return i;                                                 |
+  |}                                                             |
+  +--------------------------------------------------------------+
+  3.3.1 La sezione critica creata disabilitando le interruzioni serve a
+        garantire che nella funzione check_periodic_tasks() (invocata in
+        modo asincrono ad ogni tick) non vengano mai presi in
+        considerazione task che non sono stati completamente
+        inizializzati
+        3.3.1.1 Secondo la documentazione ARM, l'istruzione "CPSID" e'
+                auto-sincronizzante rispetto al flusso di istruzioni in
+                cui appare e non richiede l'uso di una memory barrier
+        3.3.2 Aggiungere riferimenti alle variabili globali e ai
+              prototipi delle funzioni in comm.h
+  +-----------------------------------------------------+
+  |extern int num_tasks;                                |
+  |extern struct task taskset[MAX_NUM_TASKS];           |
+  |void init_taskset(void);                             |
+  |int create_task(job_t job, void *arg, int period,    |
+  |         int delay, int priority, const char *name); |
+  +-----------------------------------------------------+
+
+4 Implementazione dello scheduler nel file sched.c
+  4.1 Definizione della funzione check_periodic_tasks():
+  +-----------------------------------------------------+
+  |volatile unsigned long globalreleases = 0;           |
+  |void check_periodic_tasks(void)                      |
+  |{                                                    |
+  |    unsigned long now = ticks;                       |
+  |    struct task *f;                                  |
+  |    int i;                                           |
+  |    for (i=0, f=taskset; i<num_tasks; ++f) {         |
+  |        if (!f->valid)                               |
+  |            continue;                                |
+  |        if (time_after_eq(now, f->releasetime)) {    |
+  |            ++f->released;                           |
+  |            f->releasetime += f->period;             |
+  |            ++globalreleases;                        |
+  |        }                                            |
+  |        ++i;                                         |
+  |    }                                                |
+  |}                                                    |
+  +-----------------------------------------------------+
+  4.2 Definizione della funzione select_best_task():
+  +---------------------------------------------------------------+
+  |static inline struct task *select_best_task(void)              |
+  |{                                                              |
+  |    unsigned long maxprio;                                     |
+  |    struct task *best, *f;                                     |
+  |    int i;                                                     |
+  |                                                               |
+  |    maxprio = MAXUINT;                                         |
+  |    best = NULL;                                               |
+  |    for (i=0, f=taskset; i < num_tasks; ++f) {                 |
+  |        if (f - taskset >= MAX_NUM_TASKS)                      |
+  |            panic0();   /* Should never happen */              |
+  |        if (!f->valid)                                         |
+  |            continue;                                          |
+  |        ++i;                                                   |
+  |        if (f->released == 0)                                  |
+  |            continue;                                          |
+  |        if (f->priority < maxprio) {                           |
+  |            maxprio = f->priority;                             |
+  |            best = f;                                          |
+  |        }                                                      |
+  |    }                                                          |
+  |    return best;                                               |
+  |}                                                              |
+  +---------------------------------------------------------------+
+
+  4.3 Definizione della funzione run_periodic_tasks():
+  +------------------------------------------------------------+
+  |void run_periodic_tasks(void)                               |
+  |{                                                           |
+  |    struct task *best;                                      |
+  |    unsigned long state;                                    |
+  |    for (;;) {                                              |
+  |        state = globalreleases;                             |
+  |        best = select_best_task();                          |
+  |        if (best != NULL && state == globalreleases) {      |
+  |            best->job(best->arg);                           |
+  |            best->released--;                               |
+  |        }                                                   |
+  |    }                                                       |
+  |}                                                           |
+  +------------------------------------------------------------+
+
+  4.3.1 Aggiungere definizioni e prototipi in comm.h:
+  +----------------------------------------+
+  |#define MAXUINT (0xffffffffu)           |
+  |void check_periodic_tasks(void);        |
+  |void run_periodic_tasks(void);          |
+  +----------------------------------------+
+
+  4.4 Invocazione di check_periodic_tasks() ad ogni tick (in tick.c):
+  +---------------------------------------------+
+  |static void isr_tick(void)                   |
+  |{                                            |
+  |    iomem(DMTIMER0_IRQSTATUS) = OVF_IT_FLAG; |
+  |    ++ticks;                                 |
+  |    check_periodic_tasks();                  |
+  |}                                            |
+  +---------------------------------------------+
+
+5 Inizializzazione dello scheduler in _init():
+  +------------------+
+  |[...]             |
+  |init_taskset();   |
+  |init_ticks();     |
+  |[...]             |
+  +------------------+
+
+6 Verifica del funzionamento dello scheduler
+  6.1 Modificare main.c per utilizzare lo scheduler
+      +-----------------------------------------------------------------+
+      |static void led_cycle(void *arg __attribute__ ((unused)))        |
+      |{                                                                |
+      |   static int state = 1;                                         |
+      |   leds_off_mask(0xf);                                           |
+      |   leds_on_mask(state);                                          |
+      |   state = (state+1) & 0xf;                                      |
+      |}                                                                |
+      |                                                                 |
+      |void main(void)                                                  |
+      |{                                                                |
+      |    banner();                                                    |
+      |    if (create_task(led_cycle, NULL, HZ, 5, HZ, "led_cycle")     |
+      |         == -1) {                                                |
+      |        puts("ERROR: cannot create task led_cycle\n");           |
+      |        panic1();                                                |
+      |    }                                                            |
+      |    run_periodic_tasks();                                        |
+      |}                                                                |
+      +-----------------------------------------------------------------+
+  6.2 Creare il task "show_ticks":
+      +-----------------------------------------------------------------+
+      |static void show_ticks(void *arg __attribute__((unused)))        |
+      |{                                                                |
+      |    printf("\nCurrent ticks: %u\n", ticks);                      |
+      |}                                                                |
+      |                                                                 |
+      |void main(void)                                                  |
+      |[...]                                                            |
+      |    if (create_task(show_ticks, NULL, 10*HZ, 5, 10*HZ,           |
+      |        "show_ticks") == -1) {                                   |
+      |        puts("ERROR: cannot create task show_ticks\n");          |
+      |        panic1();                                                |
+      |    }                                                            |
+      |[...]                                                            |
+      +-----------------------------------------------------------------+
+
+7 Esame dello scheduler non interrombile
+  7.1 Ruolo della funzione check_periodic_tasks()
+      7.1.1 Attivata periodicamente
+      7.1.2 Rileva i rilasci dei job e aggiorna i task
+            (campi f->released e f->releasetime)
+  7.2 Ruolo della funzione run_periodic_tasks()
+      7.2.1 Cerca il task di priorita' piu' alta con job
+            da eseguire (funzione select_best_task())
+      7.2.2 Esegue il job prescelto
+      7.2.3 Ripete all'infinito
+  7.3 Race condition: poiche' check_periodic_tasks() e' asincrona
+      rispetto a run_periodic_tasks(), le modifiche ai campi released dei
+      task possono avvenire in qualunque momento
+      7.3.1 In particolare run_periodic_tasks() potrebbe scegliere
+            erroneamente un job di priorita' piu' bassa rispetto ad
+            un altro se quest'ultimo viene rilasciato dopo che la
+            funzione ha controllato il campo released nel ciclo for
+      7.3.2 La variabile globalreleases serve a mitigare questa
+            race condition: run_periodic_tasks() esegue un job
+            solo se dopo una intera scansione del vettore di task
+            nessun nuovo job viene rilasciato
+      7.3.3 Esiste ancora una finestra temporale in cui e' possibile
+            avere una race condition (tra il controllo 'state ==
+            globalreleases' e l'esecuzione del job), ma in questo caso e'
+            piu' piccola ed i tempi di blocco aggiuntivi che comporta
+            sono trascurabili rispetto ai tempi di esecuzione dei job
+
+/*
+vim: tabstop=4 softtabstop=4 expandtab list colorcolumn=74 tw=73
+*/
+
