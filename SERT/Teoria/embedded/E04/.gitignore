@@ -1,0 +1,5 @@
+*.o
+sert.sym
+sert.lst
+sert.bin
+sert.elf
