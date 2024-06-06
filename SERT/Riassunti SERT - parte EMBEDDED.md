@@ -14,9 +14,9 @@ Un parametro fondamentale per i sistemi embedded è la **dependability**, che in
 
 Per realizzare un'applicazione embedded, è necessario identificare sia i **requisiti funzionali**, come i consumi energetici e le capacità di elaborazione, sia i **requisiti non funzionali**, come i costi e il numero di pezzi da produrre. È inoltre fondamentale definire una metodologia di sviluppo basata sugli strumenti e le risorse disponibili. Nel caso dei sistemi embedded, si applica una metodologia ibrida che integra sia la parte hardware che la parte software. Esistono due approcci principali per lo sviluppo dei sistemi embedded:  
 
-
 - **A cascata:**
   Ogni livello richiede la definizione di quelli precedenti.
+  
   <img title="" src="file:///C:/Users/festa/Pictures/Screenshots/Screenshot%202024-06-05%20163715.png" alt="" width="154">
 
 - **A spirale**:  iterazione su tutte le fasi, non “torno indietro” perché faccio tutto insieme.
@@ -32,6 +32,7 @@ Spesso, si lavora su circuiti già pronti, partendo da una piattaforma generica 
    - **Caratteristiche**: Un circuito specializzato per una funzione specifica, non riprogrammabile, con costi elevati e prestazioni elevate.
      
      Si sono susseguite le tecnologie:
+     
      - **Standard Cell**: Circuiti digitali riutilizzabili, raccolti in librerie, con la stessa altezza e ridotta distanza tra le celle.
      
      - **Gate Array**: Chip parzialmente fabbricato, un'evoluzione degli ASIC.
@@ -56,8 +57,6 @@ Spesso, si lavora su circuiti già pronti, partendo da una piattaforma generica 
    - **Modalità di acquisto**: Disponibili sia fisicamente che a livello di schemi (design schematics).
    - Rilevanti sono le tipologie **DSP** per le elaborazioni numeriche, basate su  
      $z_{t+1} = z_{t}+ x \cdot y$, e la tipologia **NP** per le reti, oltre ai **microcontrollori**, che si interfacciano con più periferiche.
-
-
 
 ## Sistema Bare Metal - E03a
 
@@ -84,8 +83,6 @@ La BeagleBone Black è una scheda singola open-source con un processore ARM che 
 1. Il codice è scritto su un PC (host) e tradotto in codice macchina per la BBB usando un cross-compiler.
 2. Il feedback è fornito tramite LED luminosi sulla scheda.
 
-
-
 ## ARM - E03b
 
 ### ARM e Smartphone
@@ -103,7 +100,7 @@ I processori ARM sono raggruppati in famiglie CORTEX:
 ### Caratteristiche Tecniche
 
 - **Architettura**: 32 bit, basata su RISC, supporta sia Little-Endian che Big-Endian.
-- **Flag**: Supporta flag per eseguire o meno le istruzioni. Non richiede shift espliciti. Include moltiplicazioni, ma non divisioni.
+- **Flag**: Supporta flag per eseguire o meno le istruzioni. Non presenta shift espliciti. Include moltiplicazioni, ma non divisioni.
 
 ### Registri
 
@@ -112,7 +109,9 @@ I processori ARM sono raggruppati in famiglie CORTEX:
   | r10        | r11           | r12                   | r13           | r14                                  | r15                                                                             |
   | ---------- | ------------- | --------------------- | ------------- | ------------------------------------ | ------------------------------------------------------------------------------- |
   | size stack | frame pointer | invocazione procedure | stack pointer | link register (indirizzo di ritorno) | program counter (indirizzo della seconda istruzione sotto quella in esecuzione) |
+
 - **Altri registri importanti**: 
+  
   - **cpsr** (Current Program Status Register) con bit di condizione (Nullo, Zero, Carry, Overflow) e bit per disabilitare interruzioni.
   
   - Cinque registri **spsr** che preservano cpsr.
@@ -139,7 +138,7 @@ dei parametri o formati.
 
 ![](C:\Users\festa\AppData\Roaming\marktext\images\2024-06-05-18-37-44-image.png)
 
-### ARM e Gestione delle Procedure
+## ARM e Gestione delle Procedure
 
 ### Salvataggio e Ripristino dei Registri
 
@@ -232,7 +231,7 @@ Il processo di gestione delle interruzioni segue generalmente questi passaggi:
 
 2. **Propagazione alla CPU**:
    
-   - Il PIC propaga l'interruzione alla CPU.
+   - Il PIC propaga l'interruzione alla CPU e aspetta la conferma di ricezione (ack).
 
 3. **Conferma Rapida**:
    
@@ -244,8 +243,7 @@ Per ottimizzare questo processo e garantire una gestione rapida delle interruzio
 
 1. **Interrupt Handler**:
    
-   - Ha priorità elevata e si occupa di confermare l'interruzione al PIC, salvare e ripristinare i contesti di esecuzione del processore.
-   - È responsabile della gestione immediata dell'intera interruzione.
+   - Ha priorità elevata e si occupa di confermare la ricezione dell'interruzione al PIC, salvare e ripristinare i contesti di esecuzione del processore.
 
 2. **Interrupt Service Routine (ISR)**:
    
@@ -259,7 +257,7 @@ La fase di schedulazione è cruciale poiché determina il prossimo task da esegu
 
 Quando si cerca di mantenere la semplicità, è comune utilizzare algoritmi a priorità fissa e scheduler clock-driven con diversi livelli di priorità. Tuttavia, un numero eccessivo di livelli di priorità può portare a problemi di schedulabilità. Per risolvere questo problema, è utile mappare le schedulabilità dei task, assegnate dall'algoritmo di schedulazione, alle priorità di sistema, che sono meno numerose.
 
-Questo approccio può causare un problema non menzionato nella teoria: **task con identica priorità**. La soluzione è considerare i task con priorità uguale quando si calcolano i tempi di risposta, anziché fermarsi al livello di priorità immediatamente superiore. Questo perché non è possibile prevedere quale task verrà eseguito successivamente quando le priorità sono identiche.
+Questo approccio può causare un problema non menzionato nella teoria: **task con identica priorità**. La soluzione è considerare i task con priorità uguale quando si calcolano i tempi di risposta. Questo perché non è possibile prevedere quale task verrà eseguito successivamente quando le priorità sono identiche.
 
 In foto: $T_E$ task di pari priorità, $T_H$ task di priorità superiore.
 
@@ -271,7 +269,7 @@ Come realizzo questa associazione? Linearmente? No, vorrei essere “più precis
 
 Ciò impatta anche su alcuni teoremi:
 
-![](C:\Users\festa\AppData\Roaming\marktext\images\2024-06-05-18-47-11-image.png)
+<img src="file:///C:/Users/festa/AppData/Roaming/marktext/images/2024-06-05-18-47-11-image.png" title="" alt="" width="358">
 
 I sistemi operativi Real-Time Operating Systems (RTOS)  offrono l’impostazione della deadline relativa, EDF è poco supportato, in quanto l’ordinamento basato su deadline assoluta è poco efficiente (si preferisce usare strutture semplici). Ovviamente, si cerca di **standardizzare** i RTOS, anche per avere portabilità e interoperabilità.
 Vediamone alcuni standard:
@@ -332,8 +330,6 @@ In ambito real-time si cerca di non penalizzare i tempi di esecuzione, per cui c
    
    - Combina kernel, driver e librerie. Utilizza uno spazio di indirizzamento singolo e offre protezione della memoria. Utilizza uno scheduler a priorità fissa.
 
-
-
 ## R14 - Linux in ambito real-time
 
 Linux non è real time, ma ha alcune caratteristiche interessanti (gestione del tempo, gestione separata delle interruzioni, schedulazione con priorità, interrompibilità anche in kernel mode, gestione risorse condivise, configurazione a grana fine, facilità nel creare task kernel mode (per avere unico spazio di indirizzamento), supporto alla memoria virtuale in user mode, kernel monolitico ma ridotto). **Ciò che manca è la predicibilità**, in quanto il kernel non è completamente interrompibile, le ISR possono avere durata non predicibile, la latenza nella schedulazione è elevata.
@@ -343,14 +339,17 @@ Soluzione? **Modificare il kernel Linux**. Ma ha senso essendo monolitico? Si, i
 
 Le interruzioni sono un aspetto cruciale dei sistemi real-time e la loro gestione avviene a tre livelli:
 
-1. **Top Half**:
-   
-   - L'Interrupt Handler si occupa di salvare e ripristinare il contesto, confermare la ricezione dell'interruzione e gestire le interazioni iniziali con l'hardware.
-   - L'ISR (Interrupt Service Routine) interagisce direttamente con la periferica hardware e prenota l'esecuzione del Bottom Half.
+- **Top Half**
+  
+  1. L'Interrupt Handler si occupa di salvare e ripristinare il contesto, confermare la ricezione dell'interruzione e gestire le interazioni iniziali con l'hardware.
+  2. La parte immediata dell’ISR interagisce con la periferica H/W ed eventualmente “prenota” la successiva esecuzione del bottom half.
 
-2. **Bottom Half**:
-   
-   - Svolge operazioni lunghe che non possono essere eseguite immediatamente, ad esempio prima di tornare all'esecuzione di un processo. Viene eseguito solo se non ci sono Top Half in esecuzione.
+- **Bottom Half**
+  
+  3. Svolge operazioni lunghe generalmente interrompibili. È costituita da una procedura da eseguire quando nessun altro top half è in esecuzione, quindi:
+     - immediatamente prima di tornare ad eseguire un processo.
+     
+     - oppure per mezzo di un kernel thread.
 
 Le interruzioni, a loro volta, possono essere interrotte e non hanno una gerarchia di priorità tra di loro. Questo significa che non è una buona pratica disabilitare l'interrompibilità delle interruzioni, poiché potrebbe causare blocchi nel sistema.
 
@@ -367,12 +366,12 @@ fissa:
 
 - A parità di priorità, si usa FIFO o Round Robin.
 
--  Lo scheduler ha singola coda di processi con 100 livelli di priorità per ogni processore, consentendo quindi di implementare RM o DM.
+- Lo scheduler ha singola coda di processi con 100 livelli di priorità per ogni processore, consentendo quindi di implementare RM o DM.
 
 Esiste meccanismo che evita ad un processo RM di non rilasciare mai la CPU, bloccando il sistema.
 
 Esiste la classe “**Deadline**” utile per usare EDF. Presenta i
-parametri “*tempo esecuzione*”, “*periodo*”, “*deadline relativa*”, e le *scadenze
+parametri *tempo esecuzione*, *periodo*, *deadline relativa*, e le *scadenze
 assolute* si calcolano con **CBS**. Ogni task della classe SCHED_DEADLINE è analogo
 a un server CBS!
 
@@ -382,9 +381,7 @@ Esistono però alcuni problemi:
 
 - Un processo real time di priorità alta può comunque essere interrotto e rallentato.
 
-- Esistono meccanismi di **load balancing** sui sistemi multiprocessore, ovvero realizza la migrazione dei processi senzaconsiderare la priorità, aumentando la latenza e diminuendo la predicibilità. Si può risolvere? Si, perché tale problema si ha in sistemi multiprocessore e con schedulazione globale dei task (in quanto c’è migrazione), allora basta definire l’affinità tramite bitmap, forzando un sistema statico.
-
-
+- Esistono meccanismi di **load balancing** sui sistemi multiprocessore, ovvero realizza la migrazione dei processi senza considerare la priorità, aumentando la latenza e diminuendo la predicibilità. Si può risolvere? Si, perché tale problema si ha in sistemi multiprocessore e con schedulazione globale dei task (in quanto c’è migrazione), allora basta definire l’affinità tramite bitmap, forzando un sistema statico.
 
 ### Modifica del Kernel
 
@@ -396,12 +393,12 @@ Abbiamo detto che è necessario attuare delle modifiche, esistono due strade:
   comunicazioni implementate da Linux, l’ambiente di sviluppo è flessibile,
   portando il kernel standard a continui miglioramenti.
 
-- **Approccio dual-kernel**: poche modifiche, c’è strato software intermedio tra kernel e dispositivi hardware, per impedirne l’accesso diretto. Non punto a migliorare la predicibilità di Linux, bensì miglioro la predicibilità di un RTOS in esecuzione insieme a Linux, mediante lo stato intermedio appena citato. Nella pratica, ho due sistemi operativi con priorità diverse su stesso hardware, RTOS ha priorità maggiore ed esegue processi RT, Linux è attivo solo quando non ci sono. Lo strato intermedio intercetta e consegna le interruzioni a Linux quando è in esecuzione; quindi, tale strato sostituisce sempre la gestione iniziale delle interruzioni di Linux. RTOS è attivabile dopo aver inizializzato Linux. I vantaggi risiedono nell’indipendenza dal kernel Linux, nella possibilità di usare un RTOS specifico, devo certificare solo lo strato intermedio, e non necessito di modificare
+- **Approccio dual-kernel**: poche modifiche, c’è strato software intermedio tra kernel e dispositivi hardware, per impedirne l’accesso diretto. Non punto a migliorare la predicibilità di Linux, bensì miglioro la predicibilità di un RTOS in esecuzione insieme a Linux, mediante lo strato intermedio appena citato. Nella pratica, ho due sistemi operativi con priorità diverse su stesso hardware, RTOS ha priorità maggiore ed esegue processi RT, Linux è attivo solo quando non ci sono. Lo strato intermedio intercetta e consegna le interruzioni a Linux quando è in esecuzione; quindi, tale strato sostituisce sempre la gestione iniziale delle interruzioni di Linux. RTOS è attivabile dopo aver inizializzato Linux. I vantaggi risiedono nell’indipendenza dal kernel Linux, nella possibilità di usare un RTOS specifico, devo certificare solo lo strato intermedio, e non necessito di modificare
   radicalmente Linux. Un fattore da non sottovalutare nelle certificazioni è **il
   partizionamento spaziale di un sistema**, che richiede una precisa
   condivisione di risorse tra SO o applicazioni evitando interferenze di
   funzionamento tra di loro (Ad esempio partiziono la RAM in due zone diverse per
-  due programmi diversi). È realizzato tramite il programma **separation kernel** .
+  due programmi diversi). È realizzato tramite il programma **separation kernel**.
   
   Anche il **partizionamento temporale** è richiesto nelle certificazioni, partizionando il tempo, in modo da non avere interferenze sui tempi di esecuzione. Realizzato tramite schedulazione ciclica delle partizioni.
 
@@ -415,6 +412,6 @@ Abbiamo detto che è necessario attuare delle modifiche, esistono due strade:
 
 #### Esempi mono kernel
 
-La patch **PREEMPT_RT** riduce le sezioni non interrompibili del kernel e permette l'esecuzione dei gestori delle interruzioni in un contesto schedulabile. Questo è ottenuto introducendo gli *rt-mutex*, in grado si sospendere l'esecuzione del processo corrente (senza attentedere cambi di stato come con le primitive del kernel classiche).
+La patch **PREEMPT_RT** riduce le sezioni non interrompibili del kernel e permette l'esecuzione dei gestori delle interruzioni in un contesto schedulabile. Questo è ottenuto introducendo gli *rt-mutex*, in grado di sospendere l'esecuzione del processo corrente (senza attendere cambi di stato come con le primitive del kernel classiche).
 
 Interruzioni brevi sono inalterate, interruzioni meno brevi come *spinlock* diventano interrompibili. Si cerca anche di non annullare il bilanciamento del carico, realizzandolo prima o dopo l'esecuzione (non durante), distribuendo i processi a priorità elevata. 
