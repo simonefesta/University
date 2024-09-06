@@ -4,7 +4,8 @@
 
 ## 👨‍💻 Autore
 
-**Simone Festa**, Studente di Ingegneria Informatica presso l'Università di Roma Tor Vergata. (NB: Possono essere presenti anche elementi di autori esterni!)
+**Simone Festa**, Studente di Ingegneria Informatica presso l'Università di Roma Tor Vergata.
+(NB: Possono essere presenti anche elementi di autori esterni!)
 
 
 Questi appunti sono stati presi durante i miei studi magistrali in **Ingegneria Informatica** presso l'Università di Roma Tor Vergata. 
@@ -13,8 +14,7 @@ Questi appunti sono stati presi durante i miei studi magistrali in **Ingegneria 
 
 Questi appunti sono liberamente utilizzabili per qualsiasi scopo: studio, condivisione, modifica o meme. Sentiti liber* di fare ciò che preferisci con essi!
 
-## 🤝 Contributi
 
 
-### 🌟 Buono studio!
+## 🌟 Buono studio!
 
