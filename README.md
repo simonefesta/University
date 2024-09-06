@@ -18,3 +18,5 @@ Questi appunti sono liberamente utilizzabili per qualsiasi scopo: studio, condiv
 
 ## 🌟 Buono studio!
 
+Spero che questi appunti possano aiutarti, così come hanno aiutato me!
+
